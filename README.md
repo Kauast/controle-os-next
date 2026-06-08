@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Controle OS, Estoque e Agenda — Next.js
 
-## Getting Started
+Recriação do sistema de **ordens de serviço, estoque com QR Code, agenda por equipes e app do técnico**, agora com uma stack moderna.
 
-First, run the development server:
+## Stack
+
+- **Next.js 15** (App Router) + **TypeScript**
+- **Tailwind CSS v4**
+- **shadcn/ui** (componentes em `src/components/ui`)
+- **TanStack Query** (relatórios e financeiro)
+- **React Hook Form** + **Zod** (formulários e validação)
+- **Zustand** (estado global com persistência em localStorage)
+- **Framer Motion** (animações e transições)
+- **lucide-react** (ícones)
+
+## Funcionalidades
+
+- 4 perfis (`admin`, `estoque`, `tecnico`, `atendimento`) com controle de acesso por seção
+- Painel com indicadores em tempo real
+- Agenda das equipes com **drag & drop** de OS, calendário mensal e agendamento
+- Cadastro de OS em etapas (RHF + Zod) e fila priorizada
+- Estoque: produtos, **QR Code**, entrada/saída, alertas de estoque baixo, histórico
+- Solicitação e aprovação de material
+- Relatórios por equipe e financeiro (somente admin) via TanStack Query
+- Rastreamento das equipes em mapa simulado
+- Gestão de equipes e técnicos
+- **App do técnico** (`/tecnico`): check-in, 3 fotos, assinatura em canvas, ID do chip e
+  finalização da OS (bloqueada até cumprir todos os requisitos)
+
+## Rodando localmente
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra [http://localhost:3000](http://localhost:3000). O app do técnico fica em `/tecnico`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Estrutura
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```text
+src/
+  app/            # rotas (/ e /tecnico) + layout/globals
+  components/
+    ui/           # componentes shadcn/ui
+    layout/       # sidebar e topbar
+    dashboard/    # métricas, agenda, dispatch, fila de OS
+    stock/        # estoque e QR
+    reports/ finance/ tracking/ teams/ clients/ dialogs/
+    tecnico/      # canvas de assinatura
+  hooks/          # TanStack Query e helpers
+  lib/            # tipos, seed, utils, regras de acesso, api mock
+  store/          # Zustand (estado do app e da UI)
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+O estado começa com dados de exemplo (`src/lib/seed.ts`) e é persistido no navegador.
