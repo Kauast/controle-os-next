@@ -15,6 +15,7 @@ export interface ServiceOrder {
   scheduledDate?: string;
   scheduledMonth?: string;
   completedAt?: string;
+  _backendId?: string;
 }
 
 export interface Product {

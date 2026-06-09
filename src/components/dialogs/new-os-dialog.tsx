@@ -18,74 +18,103 @@ import {
 } from "@/components/ui/select";
 import { TEAMS } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/store/use-app-store";
 import { useUIStore } from "@/store/use-ui-store";
+import { useClients } from "@/hooks/useClients";
+import { useTechnicians } from "@/hooks/useTechnicians";
+import { useCreateServiceOrder } from "@/hooks/useServiceOrders";
 
 const schema = z.object({
-  code: z.string().min(1),
-  client: z.string().min(2, "Informe o cliente"),
+  clientId: z.string().min(1, "Selecione um cliente"),
   description: z.string().min(2, "Descreva o servico"),
-  time: z.string().min(1, "Informe o horario"),
+  priority: z.enum(["NORMAL", "WARNING", "HIGH"]),
+  scheduledTime: z.string().min(1, "Informe o horario"),
   team: z.string().min(1),
-  tech: z.string().optional(),
-  priority: z.enum(["normal", "warning", "high"]),
-  status: z.enum(["pending", "scheduled", "completed"]),
+  technicianId: z.string().optional(),
+  dueDate: z.string().min(1, "Informe o prazo"),
 });
 type Form = z.infer<typeof schema>;
 
 const steps = ["Cliente", "Servico", "Agenda", "Revisao"];
 const stepFields: Record<number, (keyof Form)[]> = {
-  1: ["client"],
+  1: ["clientId"],
   2: ["description", "priority"],
-  3: ["time", "team", "tech"],
+  3: ["scheduledTime", "team", "dueDate"],
 };
+
+function tomorrowDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  return d.toISOString().split("T")[0];
+}
 
 export function NewOsDialog() {
   const open = useUIStore((s) => s.newOsOpen);
   const setOpen = useUIStore((s) => s.setNewOsOpen);
-  const orders = useAppStore((s) => s.orders);
-  const addOrder = useAppStore((s) => s.addOrder);
-  const nextOrderCode = useAppStore((s) => s.nextOrderCode);
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+
+  const { data: clientsData } = useClients(clientSearch);
+  const clients = clientsData?.clients ?? [];
+  const { data: technicians = [] } = useTechnicians();
+  const createOS = useCreateServiceOrder();
 
   const form = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: {
-      code: "",
-      client: "",
+      clientId: "",
       description: "",
-      time: "09:00",
+      scheduledTime: "09:00",
       team: "Sem equipe",
-      tech: "",
-      priority: "normal",
-      status: "pending",
+      technicianId: "",
+      priority: "NORMAL",
+      dueDate: tomorrowDate(),
     },
   });
-  const { register, handleSubmit, setValue, watch, reset, formState, trigger } = form;
+  const { handleSubmit, setValue, watch, reset, formState, trigger } = form;
 
   useEffect(() => {
     if (open) {
-      reset();
-      setValue("code", nextOrderCode());
+      reset({
+        clientId: "",
+        description: "",
+        scheduledTime: "09:00",
+        team: "Sem equipe",
+        technicianId: "",
+        priority: "NORMAL",
+        dueDate: tomorrowDate(),
+      });
       setStep(1);
       setError("");
+      setClientSearch("");
     }
-  }, [open, reset, setValue, nextOrderCode]);
+  }, [open, reset]);
 
   async function next() {
     const valid = await trigger(stepFields[step] ?? []);
     if (valid) setStep((s) => Math.min(4, s + 1));
   }
 
-  function submit(data: Form) {
-    if (orders.some((o) => o.code === data.code.toUpperCase())) {
-      setError("Ja existe uma OS com esse numero.");
-      return;
+  async function submit(data: Form) {
+    setError("");
+    try {
+      await createOS.mutateAsync({
+        clientId: data.clientId,
+        description: data.description,
+        priority: data.priority,
+        scheduledTime: data.scheduledTime,
+        team: data.team,
+        technicianId: data.technicianId || undefined,
+        dueDate: new Date(`${data.dueDate}T23:59:59`).toISOString(),
+        items: [],
+      });
+      setOpen(false);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erro ao criar OS.");
     }
-    addOrder({ ...data, code: data.code.toUpperCase(), tech: data.tech ?? "" });
-    setOpen(false);
   }
+
+  const selectedClient = clients.find((c) => c.id === watch("clientId"));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -113,24 +142,51 @@ export function NewOsDialog() {
         <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4">
           <motion.div key={step} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}>
             {step === 1 && (
-              <Label>
-                Cliente
-                <Input {...register("client")} placeholder="Nome do cliente" />
-                {formState.errors.client && (
-                  <span className="text-[10px] text-red">{formState.errors.client.message}</span>
-                )}
-              </Label>
+              <div className="grid gap-3">
+                <Label>
+                  Buscar cliente
+                  <Input
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    placeholder="Nome ou documento..."
+                  />
+                </Label>
+                <Label>
+                  Cliente
+                  <Select
+                    value={watch("clientId")}
+                    onValueChange={(v) => setValue("clientId", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name} — {c.document}
+                        </SelectItem>
+                      ))}
+                      {clients.length === 0 && (
+                        <SelectItem value="_none" disabled>
+                          Nenhum cliente encontrado
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {formState.errors.clientId && (
+                    <span className="text-[10px] text-red">{formState.errors.clientId.message}</span>
+                  )}
+                </Label>
+              </div>
             )}
 
             {step === 2 && (
               <div className="grid gap-3">
                 <Label>
-                  Descricao
-                  <Input {...register("description")} placeholder="Servico solicitado" />
+                  Descricao do servico
+                  <Input {...form.register("description")} placeholder="Servico solicitado" />
                   {formState.errors.description && (
-                    <span className="text-[10px] text-red">
-                      {formState.errors.description.message}
-                    </span>
+                    <span className="text-[10px] text-red">{formState.errors.description.message}</span>
                   )}
                 </Label>
                 <Label>
@@ -143,9 +199,9 @@ export function NewOsDialog() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="warning">Media</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="NORMAL">Normal</SelectItem>
+                      <SelectItem value="WARNING">Media</SelectItem>
+                      <SelectItem value="HIGH">Alta</SelectItem>
                     </SelectContent>
                   </Select>
                 </Label>
@@ -155,8 +211,12 @@ export function NewOsDialog() {
             {step === 3 && (
               <div className="grid grid-cols-2 gap-3">
                 <Label>
-                  Horario
-                  <Input type="time" {...register("time")} />
+                  Horario agendado
+                  <Input type="time" {...form.register("scheduledTime")} />
+                </Label>
+                <Label>
+                  Prazo
+                  <Input type="date" {...form.register("dueDate")} min={tomorrowDate()} />
                 </Label>
                 <Label>
                   Equipe
@@ -174,38 +234,47 @@ export function NewOsDialog() {
                     </SelectContent>
                   </Select>
                 </Label>
-                <Label className="col-span-2">
+                <Label>
                   Tecnico
-                  <Input {...register("tech")} placeholder="Responsavel" />
+                  <Select
+                    value={watch("technicianId") ?? ""}
+                    onValueChange={(v) => setValue("technicianId", v === "_none" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nenhum" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">Nenhum</SelectItem>
+                      {technicians.map((t) => {
+                        const apiId = (t as { _apiId?: string })._apiId ?? String(t.id);
+                        return (
+                          <SelectItem key={apiId} value={apiId}>
+                            {t.name}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </Label>
               </div>
             )}
 
             {step === 4 && (
-              <div className="grid gap-3">
-                <div className="rounded-[12px] border border-line bg-panel-soft/50 p-3 text-sm">
-                  <strong className="block text-ink">Revise antes de salvar</strong>
-                  <p className="mt-1 text-xs text-muted">
-                    {watch("code")} · {watch("client")} · {watch("description")} · {watch("team")} ·{" "}
-                    {watch("time")} · {watch("priority")}
-                  </p>
-                </div>
-                <Label>
-                  Status
-                  <Select
-                    value={watch("status")}
-                    onValueChange={(v) => setValue("status", v as Form["status"])}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="scheduled">Agendada</SelectItem>
-                      <SelectItem value="completed">Concluida</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Label>
+              <div className="rounded-[12px] border border-line bg-panel-soft/50 p-3 text-sm">
+                <strong className="block text-ink">Revise antes de salvar</strong>
+                <p className="mt-1 text-xs text-muted">
+                  <strong>Cliente:</strong> {selectedClient?.name ?? watch("clientId")}
+                </p>
+                <p className="text-xs text-muted">
+                  <strong>Servico:</strong> {watch("description")}
+                </p>
+                <p className="text-xs text-muted">
+                  <strong>Equipe:</strong> {watch("team")} · {watch("scheduledTime")}
+                </p>
+                <p className="text-xs text-muted">
+                  <strong>Prazo:</strong> {watch("dueDate")} · <strong>Prioridade:</strong>{" "}
+                  {watch("priority")}
+                </p>
               </div>
             )}
           </motion.div>
@@ -223,7 +292,9 @@ export function NewOsDialog() {
                 Proximo
               </Button>
             ) : (
-              <Button type="submit">Adicionar OS</Button>
+              <Button type="submit" disabled={createOS.isPending}>
+                {createOS.isPending ? "Salvando..." : "Adicionar OS"}
+              </Button>
             )}
           </div>
         </form>

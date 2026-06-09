@@ -54,19 +54,33 @@ model ServiceOrder {
   clientAuthorized   Boolean    @default(false)
   version            Int        @default(1)
 
+  // Despacho e prioridade
+  team               String     @default("Sem equipe")
+  priority           Priority   @default(NORMAL)
+  scheduledTime      String?    // "HH:mm" para o dispatch board
+
   // Campos de campo: técnico em rota
   description        String?
   checkinAt          DateTime?
   checkoutAt         DateTime?
-  checkinLocation    String?    // "lat,lng" do GPS no check-in
+  checkinLocation    String?
   photoUrls          String[]   @default([])
-  clientSignature    String?    // URL da assinatura digitalizada
+  clientSignature    String?
+  chipId             String?
 
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  items    OSItem[]
-  payments Payment[]
+  items            OSItem[]
+  payments         Payment[]
+  materialRequests MaterialRequest[]
+  stockMovements   StockMovement[]
+}
+
+enum Priority {
+  NORMAL
+  WARNING
+  HIGH
 }
 
 enum Status {
@@ -109,7 +123,49 @@ model Product {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  items OSItem[]
+  items            OSItem[]
+  stockMovements   StockMovement[]
+  materialRequests MaterialRequest[]
+}
+
+model StockMovement {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id])
+  type           MovementType
+  quantity       Int
+  reason         String?
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  userId         String?
+  createdAt      DateTime     @default(now())
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model MaterialRequest {
+  id             String          @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder    @relation(fields: [serviceOrderId], references: [id])
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id])
+  quantity       Int
+  status         RequestStatus   @default(PENDING)
+  requestedBy    String?
+  reviewedBy     String?
+  reviewNote     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model Payment {

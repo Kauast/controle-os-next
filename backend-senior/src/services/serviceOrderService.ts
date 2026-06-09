@@ -1,9 +1,15 @@
-import { Status } from '@prisma/client';
+import { Priority, Status } from '@prisma/client';
 import dayjs from 'dayjs';
-import { canTransition, createOSSchema, CreateOSInput } from '../lib/serviceOrderRules';
+import {
+  canTransition,
+  createOSSchema,
+  CreateOSInput,
+  UpdateExecutionInput,
+  updateExecutionSchema,
+} from '../lib/serviceOrderRules';
 import { prisma } from '../lib/prisma';
 
-export { createOSSchema, canTransition, type CreateOSInput };
+export { createOSSchema, updateExecutionSchema, canTransition, type CreateOSInput };
 
 export class ServiceOrderService {
   async create(data: CreateOSInput) {
@@ -48,7 +54,11 @@ export class ServiceOrderService {
           technicianId: data.technicianId,
           dueDate,
           totalAmount: total,
-          items: { create: data.items },
+          description: data.description,
+          team: data.team ?? 'Sem equipe',
+          priority: (data.priority as Priority) ?? 'NORMAL',
+          scheduledTime: data.scheduledTime,
+          items: data.items.length > 0 ? { create: data.items } : undefined,
         },
         include: { client: true, technician: true, items: true },
       });
@@ -73,7 +83,7 @@ export class ServiceOrderService {
 
       if (newStatus === 'COMPLETED') {
         const totalPaid = os.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-        if (totalPaid < Number(os.totalAmount)) {
+        if (totalPaid < Number(os.totalAmount) && Number(os.totalAmount) > 0) {
           throw new Error('OS não pode ser concluída: pagamento pendente');
         }
       }
@@ -97,11 +107,54 @@ export class ServiceOrderService {
     });
   }
 
-  async list(filters: { status?: Status; page?: number; limit?: number }) {
+  async assign(id: string, team: string, technicianId?: string | null) {
+    const os = await prisma.serviceOrder.findUnique({ where: { id } });
+    if (!os) throw new Error('OS não encontrada');
+
+    return prisma.serviceOrder.update({
+      where: { id },
+      data: {
+        team,
+        technicianId: technicianId === null ? null : (technicianId ?? os.technicianId),
+      },
+      include: { client: true, technician: true },
+    });
+  }
+
+  async updateExecution(id: string, data: UpdateExecutionInput) {
+    const os = await prisma.serviceOrder.findUnique({ where: { id } });
+    if (!os) throw new Error('OS não encontrada');
+
+    const updateData: Record<string, unknown> = {};
+    if (data.checkinAt !== undefined) updateData.checkinAt = new Date(data.checkinAt);
+    if (data.checkoutAt !== undefined) updateData.checkoutAt = new Date(data.checkoutAt);
+    if (data.checkinLocation !== undefined) updateData.checkinLocation = data.checkinLocation;
+    if (data.photoUrls !== undefined) updateData.photoUrls = data.photoUrls;
+    if (data.clientSignature !== undefined) updateData.clientSignature = data.clientSignature;
+    if (data.chipId !== undefined) updateData.chipId = data.chipId;
+
+    return prisma.serviceOrder.update({
+      where: { id },
+      data: updateData,
+      include: { client: true, technician: true },
+    });
+  }
+
+  async list(filters: {
+    status?: Status;
+    team?: string;
+    technicianId?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const page = filters.page ?? 1;
-    const limit = Math.min(filters.limit ?? 10, 100);
+    const limit = Math.min(filters.limit ?? 20, 100);
     const skip = (page - 1) * limit;
-    const where = filters.status ? { status: filters.status } : {};
+
+    const where: Record<string, unknown> = {};
+    if (filters.status) where.status = filters.status;
+    if (filters.team) where.team = filters.team;
+    if (filters.technicianId) where.technicianId = filters.technicianId;
 
     const [serviceOrders, total] = await Promise.all([
       prisma.serviceOrder.findMany({
@@ -109,7 +162,7 @@ export class ServiceOrderService {
         skip,
         take: limit,
         include: { client: true, technician: true },
-        orderBy: { openingDate: 'desc' },
+        orderBy: [{ openingDate: 'desc' }],
       }),
       prisma.serviceOrder.count({ where }),
     ]);
@@ -125,6 +178,7 @@ export class ServiceOrderService {
         technician: true,
         items: { include: { product: true } },
         payments: true,
+        materialRequests: { include: { product: true } },
       },
     });
     if (!os) throw new Error('OS não encontrada');

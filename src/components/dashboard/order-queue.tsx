@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
 
 export function OrderQueue() {
-  const orders = sortOrders(useVisibleOrders().filter((o) => o.team !== "Sem equipe"));
+  const orders = sortOrders(useVisibleOrders().filter((o) => o.team !== "Sem equipe" && o.team !== ""));
 
   return (
     <Card>

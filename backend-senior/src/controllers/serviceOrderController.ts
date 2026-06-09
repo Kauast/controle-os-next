@@ -1,6 +1,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Status } from '@prisma/client';
-import { ServiceOrderService, createOSSchema } from '../services/serviceOrderService';
+import {
+  ServiceOrderService,
+  createOSSchema,
+  updateExecutionSchema,
+} from '../services/serviceOrderService';
 
 const service = new ServiceOrderService();
 
@@ -24,17 +28,48 @@ export class ServiceOrderController {
     return reply.send(result);
   }
 
-  async list(
+  async assign(
     request: FastifyRequest<{
-      Querystring: { status?: string; page?: string; limit?: string };
+      Params: { id: string };
+      Body: { team: string; technicianId?: string | null };
     }>,
     reply: FastifyReply
   ) {
-    const { status, page, limit } = request.query;
+    const { id } = request.params;
+    const { team, technicianId } = request.body;
+    const result = await service.assign(id, team, technicianId);
+    return reply.send(result);
+  }
+
+  async updateExecution(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) {
+    const { id } = request.params;
+    const data = updateExecutionSchema.parse(request.body);
+    const result = await service.updateExecution(id, data);
+    return reply.send(result);
+  }
+
+  async list(
+    request: FastifyRequest<{
+      Querystring: {
+        status?: string;
+        team?: string;
+        technicianId?: string;
+        page?: string;
+        limit?: string;
+      };
+    }>,
+    reply: FastifyReply
+  ) {
+    const { status, team, technicianId, page, limit } = request.query;
     const result = await service.list({
       status: status as Status | undefined,
+      team,
+      technicianId,
       page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 10,
+      limit: limit ? parseInt(limit) : 20,
     });
     return reply.send(result);
   }

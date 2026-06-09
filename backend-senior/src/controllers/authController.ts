@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { AuthService, loginSchema, registerSchema } from '../services/authService';
+import { prisma } from '../lib/prisma';
 
 const service = new AuthService();
 
@@ -23,6 +24,10 @@ export class AuthController {
   }
 
   async me(request: FastifyRequest, reply: FastifyReply) {
-    return reply.send(request.user);
+    const user = request.user as { id: string; email: string; role: string };
+    const technician = user.role === 'TECHNICIAN'
+      ? await prisma.technician.findUnique({ where: { userId: user.id } })
+      : null;
+    return reply.send({ ...user, technician });
   }
 }

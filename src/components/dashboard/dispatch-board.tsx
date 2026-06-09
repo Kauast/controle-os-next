@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
 import { useTechnicians } from "@/hooks/useTechnicians";
+import { useAssignServiceOrder } from "@/hooks/useServiceOrders";
 import { STATUS_DOT } from "@/lib/constants";
 
 function DispatchCard({ code, client, time }: { code: string; client: string; time: string }) {
@@ -25,29 +26,35 @@ function DispatchCard({ code, client, time }: { code: string; client: string; ti
 export function DispatchBoard() {
   const role = useAppStore((s) => s.role);
   const activeTeam = useAppStore((s) => s.activeTeam);
-  const assignOrder = useAppStore((s) => s.assignOrder);
   const { data: technicians = [] } = useTechnicians();
   const orders = useVisibleOrders();
+  const assignOrder = useAssignServiceOrder();
   const [dragCode, setDragCode] = useState<string | null>(null);
+  const [dragBackendId, setDragBackendId] = useState<string | null>(null);
   const [overTeam, setOverTeam] = useState<string | null>(null);
 
   const technicianView = !access.seesAllOrders(role);
   const available = sortOrders(orders.filter((o) => o.team === "Sem equipe"));
 
   const teamMembers = (team: string) =>
-    technicians
-      .filter((t) => t.team === team)
-      .map((t) => t.name)
-      .join(", ") || "Sem tecnico";
+    technicians.filter((t) => t.team === team).map((t) => t.name).join(", ") || "Sem tecnico";
   const teamStatus = (team: string) =>
     technicians.find((t) => t.team === team && t.status !== "Disponivel")?.status ?? "Disponivel";
 
   const visibleTeams = technicianView ? TEAMS.filter((t) => t === activeTeam) : TEAMS;
 
   function drop(team: string) {
-    if (dragCode) assignOrder(dragCode, team);
+    if (dragBackendId) {
+      assignOrder.mutate({ id: dragBackendId, team });
+    }
     setDragCode(null);
+    setDragBackendId(null);
     setOverTeam(null);
+  }
+
+  function startDrag(code: string, backendId: string) {
+    setDragCode(code);
+    setDragBackendId(backendId);
   }
 
   return (
@@ -70,13 +77,17 @@ export function DispatchBoard() {
                 <article
                   key={o.code}
                   draggable
-                  onDragStart={() => setDragCode(o.code)}
+                  onDragStart={() => startDrag(o.code, o._backendId ?? o.code)}
                   className={cn(
                     "cursor-grab rounded-[10px] border border-line bg-panel p-2.5 active:cursor-grabbing",
                     toneBorder[orderTone(o)],
                   )}
                 >
-                  <DispatchCard code={o.code} client={o.client} time={`${o.time} · ${o.description.slice(0, 22)}`} />
+                  <DispatchCard
+                    code={o.code}
+                    client={o.client}
+                    time={`${o.time} · ${o.description.slice(0, 22)}`}
+                  />
                 </article>
               ))}
               {available.length === 0 && (
@@ -122,13 +133,17 @@ export function DispatchBoard() {
                     <article
                       key={o.code}
                       draggable
-                      onDragStart={() => setDragCode(o.code)}
+                      onDragStart={() => startDrag(o.code, o._backendId ?? o.code)}
                       className={cn(
                         "cursor-grab rounded-[10px] border border-line bg-panel p-2.5",
                         toneBorder[orderTone(o)],
                       )}
                     >
-                      <DispatchCard code={o.code} client={o.client} time={`${o.time} · ${o.status === "completed" ? "concluida" : "agendada"}`} />
+                      <DispatchCard
+                        code={o.code}
+                        client={o.client}
+                        time={`${o.time} · ${o.status === "completed" ? "concluida" : "agendada"}`}
+                      />
                     </article>
                   ))}
                   {teamOrders.length === 0 && (

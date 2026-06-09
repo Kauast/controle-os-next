@@ -49,16 +49,28 @@ export class ProductService {
     return { products, total, page, totalPages: Math.ceil(total / limit) };
   }
 
-  async adjustStock(id: string, quantity: number) {
+  async adjustStock(id: string, quantity: number, reason?: string, userId?: string) {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new Error('Produto não encontrado');
 
     const newQty = product.stockQuantity + quantity;
     if (newQty < 0) throw new Error('Estoque não pode ser negativo');
 
-    return prisma.product.update({
-      where: { id },
-      data: { stockQuantity: newQty },
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: { id },
+        data: { stockQuantity: newQty },
+      });
+      await tx.stockMovement.create({
+        data: {
+          productId: id,
+          type: quantity > 0 ? 'IN' : 'OUT',
+          quantity: Math.abs(quantity),
+          reason: reason ?? (quantity > 0 ? 'Entrada de estoque' : 'Saída de estoque'),
+          userId,
+        },
+      });
+      return updated;
     });
   }
 

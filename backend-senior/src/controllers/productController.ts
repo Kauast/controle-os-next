@@ -21,8 +21,8 @@ export class ProductController {
     request: FastifyRequest<{ Params: { id: string }; Body: { quantity: number; reason: string } }>,
     reply: FastifyReply
   ) {
-    const { quantity } = adjustStockSchema.parse(request.body);
-    return reply.send(await service.adjustStock(request.params.id, quantity));
+    const { quantity, reason } = adjustStockSchema.parse(request.body);
+    return reply.send(await service.adjustStock(request.params.id, quantity, reason));
   }
 
   async lowStock(_request: FastifyRequest, reply: FastifyReply) {

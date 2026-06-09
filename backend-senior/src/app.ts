@@ -9,6 +9,7 @@ import technicianRoutes from './routes/technicianRoutes';
 import productRoutes from './routes/productRoutes';
 import authRoutes from './routes/authRoutes';
 import reportRoutes from './routes/reportRoutes';
+import materialRequestRoutes from './routes/materialRequestRoutes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const isTest = process.env.NODE_ENV === 'test';
@@ -48,6 +49,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(productRoutes, { prefix: '/api/products' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(reportRoutes, { prefix: '/api/reports' });
+  await app.register(materialRequestRoutes, { prefix: '/api/material-requests' });
 
   return app;
 }

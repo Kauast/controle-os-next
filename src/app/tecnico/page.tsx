@@ -18,53 +18,102 @@ import {
 } from "@/components/ui/select";
 import { SignaturePad } from "@/components/tecnico/signature-pad";
 import { orderLabel } from "@/lib/orders";
-import { TEAMS } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/store/use-app-store";
-import { useHydrated } from "@/hooks/use-hydrated";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useServiceOrders, useUpdateServiceOrderStatus, useUpdateExecution } from "@/hooks/useServiceOrders";
+import { useProducts } from "@/hooks/useProducts";
+import { useCreateMaterialRequest } from "@/hooks/useMaterialRequests";
+import type { ServiceOrder as BackendServiceOrder } from "@/hooks/useServiceOrders";
 
 const PHOTO_SLOTS = [
-  { slot: "1", label: "Antes" },
-  { slot: "2", label: "Durante" },
-  { slot: "3", label: "Depois" },
+  { slot: "0", label: "Antes" },
+  { slot: "1", label: "Durante" },
+  { slot: "2", label: "Depois" },
 ];
 
+function mapStatus(status: string) {
+  if (status === "COMPLETED" || status === "CANCELLED") return "completed";
+  return "pending";
+}
+
+function mapPriority(p: string): "normal" | "warning" | "high" {
+  if (p === "HIGH") return "high";
+  if (p === "WARNING") return "warning";
+  return "normal";
+}
+
+function adaptOrder(os: BackendServiceOrder) {
+  return {
+    ...os,
+    code: `OS-${String(os.number).padStart(4, "0")}`,
+    clientName: (os.client as { name: string })?.name ?? "",
+    clientPhone: (os.client as { phone?: string })?.phone ?? "",
+    status: mapStatus(os.status),
+    priority: mapPriority(os.priority),
+    description: os.description ?? "",
+    scheduledTime: os.scheduledTime ?? "00:00",
+  };
+}
+
 export default function TecnicoPage() {
-  const hydrated = useHydrated();
-  const activeTeam = useAppStore((s) => s.activeTeam);
-  const setActiveTeam = useAppStore((s) => s.setActiveTeam);
-  const orders = useAppStore((s) => s.orders);
-  const products = useAppStore((s) => s.products);
-  const checkinDone = useAppStore((s) => s.checkinDone);
-  const photos = useAppStore((s) => s.photos);
-  const signature = useAppStore((s) => s.signature);
-  const chipId = useAppStore((s) => s.chipId);
-  const setCheckin = useAppStore((s) => s.setCheckin);
-  const savePhoto = useAppStore((s) => s.savePhoto);
-  const saveSignature = useAppStore((s) => s.saveSignature);
-  const clearSignature = useAppStore((s) => s.clearSignature);
-  const verifyChip = useAppStore((s) => s.verifyChip);
-  const completeOrder = useAppStore((s) => s.completeOrder);
-  const createRequest = useAppStore((s) => s.createRequest);
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
+  const technicianId = currentUser?.technician?.id;
+
+  const { data: osData, isLoading: osLoading } = useServiceOrders(
+    technicianId ? { technicianId, limit: 50 } : {}
+  );
+  const backendOrders = osData?.serviceOrders ?? [];
+  const orders = backendOrders.map(adaptOrder);
+  const activeOrder = orders.find((o) => o.status !== "completed") ?? orders[0];
+  const activeBackend = backendOrders.find((o) => o.id === activeOrder?.id);
+
+  const { data: products = [] } = useProducts();
+
+  const updateStatus = useUpdateServiceOrderStatus();
+  const updateExecution = useUpdateExecution();
+  const createRequest = useCreateMaterialRequest();
 
   const fileRef = useRef<HTMLInputElement>(null);
-  const targetSlot = useRef<string>("3");
+  const targetSlot = useRef<string>("0");
+
+  const [localPhotos, setLocalPhotos] = useState<Record<string, string>>({});
+  const [localSignature, setLocalSignature] = useState<string | null>(null);
   const [chipDraft, setChipDraft] = useState("");
-  const [reqProduct, setReqProduct] = useState(products[0]?.name ?? "");
+  const [chipConfirmed, setChipConfirmed] = useState(false);
+  const [reqProductId, setReqProductId] = useState("");
   const [reqQty, setReqQty] = useState(1);
 
-  if (!hydrated) {
+  if (userLoading || osLoading) {
     return <div className="grid min-h-screen place-items-center text-muted">Carregando...</div>;
   }
 
-  const teamOrders = orders.filter((o) => o.team === activeTeam);
-  const activeOrder = teamOrders.find((o) => o.status !== "completed") ?? teamOrders[0];
-  const photoCount = PHOTO_SLOTS.filter((p) => photos[p.slot]).length;
-  const chipOk = !!chipId && chipId.replace(/\D/g, "").length >= 10;
+  if (!technicianId) {
+    return (
+      <div className="grid min-h-screen place-items-center text-muted">
+        <div className="text-center">
+          <p className="text-sm">Perfil de técnico não encontrado para este usuário.</p>
+          <Link href="/" className="mt-2 block text-teal underline">
+            Voltar ao painel
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const photoCount = PHOTO_SLOTS.filter((p) => {
+    const existing = activeBackend?.photoUrls?.[parseInt(p.slot)];
+    return existing || localPhotos[p.slot];
+  }).length;
+
+  const checkinDone = !!activeBackend?.checkinAt;
+  const signatureDone = !!(activeBackend?.clientSignature || localSignature);
+  const chipId = activeBackend?.chipId ?? null;
+  const chipOk = !!(chipId && chipId.replace(/\D/g, "").length >= 10) || chipConfirmed;
+
   const requirements = [
     { key: "checkin", label: "Iniciar atendimento", done: checkinDone },
     { key: "photos", label: "3 fotos", done: photoCount >= 3 },
-    { key: "signature", label: "Assinatura", done: !!signature },
+    { key: "signature", label: "Assinatura", done: signatureDone },
     { key: "chip", label: "ID do chip", done: chipOk },
   ];
   const canFinish = requirements.every((r) => r.done) && activeOrder?.status !== "completed";
@@ -76,11 +125,55 @@ export default function TecnicoPage() {
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeOrder) return;
     const reader = new FileReader();
-    reader.onload = () => savePhoto(targetSlot.current, reader.result as string);
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setLocalPhotos((prev) => ({ ...prev, [targetSlot.current]: dataUrl }));
+      const currentUrls = activeBackend?.photoUrls ?? [];
+      const newUrls = [...currentUrls];
+      newUrls[parseInt(targetSlot.current)] = dataUrl;
+      await updateExecution.mutateAsync({ id: activeOrder.id, photoUrls: newUrls });
+    };
     reader.readAsDataURL(file);
     e.target.value = "";
+  }
+
+  async function handleCheckin() {
+    if (!activeOrder) return;
+    await updateExecution.mutateAsync({
+      id: activeOrder.id,
+      checkinAt: new Date().toISOString(),
+    });
+    await updateStatus.mutateAsync({ id: activeOrder.id, status: "IN_PROGRESS" });
+  }
+
+  async function handleSignature(sig: string) {
+    setLocalSignature(sig);
+    if (!activeOrder) return;
+    await updateExecution.mutateAsync({ id: activeOrder.id, clientSignature: sig });
+  }
+
+  async function handleChip() {
+    if (!activeOrder) return;
+    await updateExecution.mutateAsync({ id: activeOrder.id, chipId: chipDraft });
+    setChipConfirmed(chipDraft.replace(/\D/g, "").length >= 10);
+  }
+
+  async function handleFinish() {
+    if (!activeOrder || !canFinish) return;
+    await updateExecution.mutateAsync({ id: activeOrder.id, checkoutAt: new Date().toISOString() });
+    await updateStatus.mutateAsync({ id: activeOrder.id, status: "COMPLETED" });
+  }
+
+  async function handleRequest() {
+    if (!activeOrder || !reqProductId) return;
+    await createRequest.mutateAsync({
+      serviceOrderId: activeOrder.id,
+      productId: reqProductId,
+      quantity: reqQty,
+    });
+    setReqQty(1);
   }
 
   return (
@@ -94,29 +187,22 @@ export default function TecnicoPage() {
         <Image src="/logo.svg" alt="Logo" width={36} height={36} className="rounded-[10px]" />
         <div className="flex-1 leading-tight">
           <span className="text-[11px] text-muted">Area do tecnico</span>
-          <strong className="block text-sm text-ink">Minhas OS</strong>
+          <strong className="block text-sm text-ink">
+            {currentUser?.technician?.name ?? "Minhas OS"}
+          </strong>
         </div>
-        <Select value={activeTeam} onValueChange={setActiveTeam}>
-          <SelectTrigger className="h-9 w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TEAMS.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <span className="rounded-full bg-teal-soft px-2 py-0.5 text-[11px] font-semibold text-teal">
+          {currentUser?.technician?.team ?? ""}
+        </span>
       </header>
 
       <div className="flex flex-col gap-4 p-4">
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            { label: "OS do dia", value: teamOrders.length },
-            { label: "Pendentes", value: teamOrders.filter((o) => o.status !== "completed").length },
-            { label: "Concluidas", value: teamOrders.filter((o) => o.status === "completed").length },
-            { label: "Tempo medio", value: "1h42" },
+            { label: "OS do dia", value: orders.length },
+            { label: "Pendentes", value: orders.filter((o) => o.status !== "completed").length },
+            { label: "Concluidas", value: orders.filter((o) => o.status === "completed").length },
+            { label: "Equipe", value: currentUser?.technician?.team ?? "—" },
           ].map((s) => (
             <div key={s.label} className="rounded-[12px] border border-line bg-panel-soft/40 p-2.5 text-center">
               <strong className="block text-lg text-ink">{s.value}</strong>
@@ -127,26 +213,35 @@ export default function TecnicoPage() {
 
         <section className="flex flex-col gap-2">
           <strong className="text-sm text-ink">Ordens de servico</strong>
-          {teamOrders.map((o) => {
-            const label = orderLabel(o);
+          {orders.map((o) => {
+            const fakeOrder = {
+              ...o,
+              client: o.clientName,
+              tech: "",
+              time: o.scheduledTime,
+              status: (o.status === "completed" ? "completed" : "pending") as import("@/lib/types").OrderStatus,
+            };
+            const label = orderLabel(fakeOrder);
             return (
               <article
-                key={o.code}
+                key={o.id}
                 className={cn(
                   "rounded-[12px] border border-line bg-panel-soft/40 p-3",
-                  o.code === activeOrder?.code && "border-teal bg-teal-soft/40",
+                  o.id === activeOrder?.id && "border-teal bg-teal-soft/40",
                 )}
               >
                 <Badge tone={label.pill}>{label.text}</Badge>
                 <strong className="mt-1 block text-sm text-ink">{o.code}</strong>
                 <small className="text-xs text-muted">
-                  {o.client} · {o.time} · {o.status === "completed" ? "Finalizada" : "Em aberto"}
+                  {o.clientName} · {o.scheduledTime} · {o.status === "completed" ? "Finalizada" : "Em aberto"}
                 </small>
               </article>
             );
           })}
-          {teamOrders.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted">Nenhuma OS para {activeTeam}.</p>
+          {orders.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted">
+              Nenhuma OS atribuida a voce.
+            </p>
           )}
         </section>
 
@@ -158,20 +253,24 @@ export default function TecnicoPage() {
               className="rounded-[14px] border border-line bg-panel-soft/40 p-4"
             >
               <div className="flex items-center gap-2">
-                <Badge tone={orderLabel(activeOrder).pill}>{orderLabel(activeOrder).text}</Badge>
+                <Badge tone={activeOrder.priority === "high" ? "red" : activeOrder.priority === "warning" ? "amber" : "teal"}>
+                  {activeOrder.priority === "high" ? "Alta" : activeOrder.priority === "warning" ? "Media" : "Normal"}
+                </Badge>
                 <strong className="text-sm text-ink">{activeOrder.code}</strong>
               </div>
-              <h2 className="mt-1 text-lg font-bold text-ink">{activeOrder.client}</h2>
+              <h2 className="mt-1 text-lg font-bold text-ink">{activeOrder.clientName}</h2>
               <p className="text-sm text-muted">{activeOrder.description}</p>
               <div className="mt-3 flex gap-2">
-                <Button variant="secondary" size="sm" className="flex-1" asChild>
-                  <a href="tel:+551140001000">
-                    <Phone /> Ligar
-                  </a>
-                </Button>
+                {activeOrder.clientPhone && (
+                  <Button variant="secondary" size="sm" className="flex-1" asChild>
+                    <a href={`tel:${activeOrder.clientPhone}`}>
+                      <Phone /> Ligar
+                    </a>
+                  </Button>
+                )}
                 <Button variant="secondary" size="sm" className="flex-1" asChild>
                   <a
-                    href="https://www.google.com/maps/search/?api=1&query=Rua%20das%20Flores%20120"
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeOrder.clientName)}`}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -181,8 +280,8 @@ export default function TecnicoPage() {
               </div>
               <Button
                 className="mt-3 w-full"
-                disabled={checkinDone}
-                onClick={setCheckin}
+                disabled={checkinDone || updateExecution.isPending}
+                onClick={handleCheckin}
               >
                 {checkinDone ? "Atendimento iniciado" : "Iniciar atendimento"}
               </Button>
@@ -213,32 +312,43 @@ export default function TecnicoPage() {
               </div>
 
               <div className="mb-3 grid grid-cols-3 gap-2">
-                {PHOTO_SLOTS.map((p) => (
-                  <button
-                    key={p.slot}
-                    onClick={() => pickPhoto(p.slot)}
-                    className="relative grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-dashed border-line bg-panel"
-                  >
-                    {photos[p.slot] && photos[p.slot].startsWith("data:") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={photos[p.slot]} alt={p.label} className="absolute inset-0 size-full object-cover" />
-                    ) : photos[p.slot] ? (
-                      <CheckCircle2 className="size-6 text-teal" />
-                    ) : (
-                      <Camera className="size-5 text-muted" />
-                    )}
-                    <span className="absolute bottom-1 text-[10px] font-semibold text-ink/80">{p.label}</span>
-                  </button>
-                ))}
+                {PHOTO_SLOTS.map((p) => {
+                  const existing = activeBackend?.photoUrls?.[parseInt(p.slot)];
+                  const local = localPhotos[p.slot];
+                  const src = local || existing;
+                  return (
+                    <button
+                      key={p.slot}
+                      onClick={() => pickPhoto(p.slot)}
+                      className="relative grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-dashed border-line bg-panel"
+                    >
+                      {src ? (
+                        src.startsWith("data:") ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={src} alt={p.label} className="absolute inset-0 size-full object-cover" />
+                        ) : (
+                          <CheckCircle2 className="size-6 text-teal" />
+                        )
+                      ) : (
+                        <Camera className="size-5 text-muted" />
+                      )}
+                      <span className="absolute bottom-1 text-[10px] font-semibold text-ink/80">{p.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
-              <SignaturePad value={signature} onConfirm={saveSignature} onClear={clearSignature} />
+              <SignaturePad
+                value={localSignature ?? activeBackend?.clientSignature ?? null}
+                onConfirm={handleSignature}
+                onClear={() => setLocalSignature(null)}
+              />
 
               <div className="mt-3 rounded-[12px] border border-line bg-panel p-3">
                 <Label>
                   ID CHIP
                   <Input
-                    value={chipDraft}
+                    value={chipDraft || chipId || ""}
                     onChange={(e) => setChipDraft(e.target.value)}
                     placeholder="8955 0400 1234 5678 9012"
                   />
@@ -246,19 +356,20 @@ export default function TecnicoPage() {
                 <Button
                   variant="secondary"
                   className="mt-2 w-full"
-                  onClick={() => verifyChip(chipDraft)}
+                  onClick={handleChip}
+                  disabled={updateExecution.isPending}
                 >
                   <BadgeCheck /> Confirmar ID do chip
                 </Button>
                 <small className={cn("mt-1 block text-xs", chipOk ? "text-teal" : "text-muted")}>
-                  {chipOk ? `ID do chip confirmado: ${chipId}` : "ID do chip pendente"}
+                  {chipOk ? `ID confirmado: ${chipId ?? chipDraft}` : "ID do chip pendente"}
                 </small>
               </div>
 
               <Button
                 className="mt-3 w-full"
-                disabled={!canFinish}
-                onClick={() => completeOrder(activeOrder.code)}
+                disabled={!canFinish || updateStatus.isPending}
+                onClick={handleFinish}
               >
                 {activeOrder.status === "completed" ? "OS concluida" : "Finalizar OS"}
               </Button>
@@ -270,13 +381,13 @@ export default function TecnicoPage() {
                 Confira a quantidade na central antes de solicitar material para esta OS.
               </p>
               <div className="flex flex-col gap-2">
-                <Select value={reqProduct} onValueChange={setReqProduct}>
+                <Select value={reqProductId} onValueChange={setReqProductId}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione um produto" />
                   </SelectTrigger>
                   <SelectContent>
                     {products.map((p) => (
-                      <SelectItem key={p.id} value={p.name}>
+                      <SelectItem key={p._apiId ?? String(p.id)} value={p._apiId ?? String(p.id)}>
                         {p.name} ({p.qty} em estoque)
                       </SelectItem>
                     ))}
@@ -292,7 +403,8 @@ export default function TecnicoPage() {
                   />
                   <Button
                     className="flex-1"
-                    onClick={() => createRequest({ name: reqProduct, qty: reqQty })}
+                    onClick={handleRequest}
+                    disabled={!reqProductId || createRequest.isPending}
                   >
                     Solicitar material
                   </Button>
