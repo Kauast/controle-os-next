@@ -10,6 +10,7 @@ import clientRoutes from './routes/clientRoutes';
 import technicianRoutes from './routes/technicianRoutes';
 import productRoutes from './routes/productRoutes';
 import authRoutes from './routes/authRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 export const prisma = new PrismaClient();
 
@@ -35,6 +36,7 @@ const start = async () => {
   await app.register(technicianRoutes, { prefix: '/api/technicians' });
   await app.register(productRoutes, { prefix: '/api/products' });
   await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(reportRoutes, { prefix: '/api/reports' });
 
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
     app.log.error(error);

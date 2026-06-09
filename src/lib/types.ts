@@ -19,6 +19,7 @@ export interface ServiceOrder {
 
 export interface Product {
   id: number;
+  _apiId?: string;
   name: string;
   sku: string;
   category: string;
@@ -57,6 +58,7 @@ export interface MaterialRequest {
 
 export interface Technician {
   id: number;
+  _apiId?: string;
   name: string;
   phone: string;
   status: string;

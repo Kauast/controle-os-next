@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Smartphone } from "lucide-react";
-import { Sidebar } from "@/components/layout/sidebar";
+import { Sidebar, MobileSidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Metrics } from "@/components/dashboard/metrics";
 import { AgendaPanel } from "@/components/dashboard/agenda-panel";
@@ -83,6 +83,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen overflow-x-hidden">
       <Sidebar />
+      <MobileSidebar />
       <main className="flex min-w-0 flex-1 flex-col">
         <Topbar />
         <div className="flex-1 overflow-y-auto p-4 lg:p-7">

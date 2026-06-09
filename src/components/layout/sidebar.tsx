@@ -10,9 +10,10 @@ import {
   Package,
   UserCog,
   Users,
+  X,
 } from "lucide-react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { canAccessSection, type SectionKey } from "@/lib/access";
 import { useAppStore } from "@/store/use-app-store";
@@ -56,7 +57,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
   },
 ];
 
-export function Sidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const role = useAppStore((s) => s.role);
   const orders = useAppStore((s) => s.orders);
   const { section, stockTarget, setSection } = useUIStore();
@@ -65,8 +66,8 @@ export function Sidebar() {
   const done = orders.filter((o) => o.status === "completed").length;
 
   return (
-    <aside className="hidden w-[260px] shrink-0 flex-col gap-6 border-r border-line bg-panel/80 p-5 lg:flex">
-      <div className="flex items-center gap-3">
+    <>
+      <div className="flex items-center gap-3 px-5 py-5">
         <Image src="/logo.svg" alt="Logo" width={44} height={44} className="rounded-[12px]" />
         <div className="leading-tight">
           <strong className="block text-sm text-ink">Controle OS</strong>
@@ -74,7 +75,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto scrollbar-none">
+      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 scrollbar-none">
         {groups.map((group, gi) => {
           const visible = group.items.filter((item) => canAccessSection(item.key, role));
           if (visible.length === 0) return null;
@@ -93,7 +94,10 @@ export function Sidebar() {
                 return (
                   <button
                     key={item.label}
-                    onClick={() => setSection(item.key, item.stockTarget ?? null)}
+                    onClick={() => {
+                      setSection(item.key, item.stockTarget ?? null);
+                      onNavigate?.();
+                    }}
                     className={cn(
                       "relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-sm font-medium text-muted transition-colors hover:text-ink",
                       isActive && "text-teal",
@@ -116,13 +120,59 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="rounded-[14px] border border-line bg-panel-soft p-3.5">
+      <div className="mx-5 mb-5 rounded-[14px] border border-line bg-panel-soft p-3.5">
         <span className="text-[10px] uppercase tracking-wide text-muted">Plantao do dia</span>
-        <strong className="mt-1 block text-sm text-ink">6 tecnicos em campo</strong>
+        <strong className="mt-1 block text-sm text-ink">Equipes em campo</strong>
         <small className="text-xs text-muted">
           {open} OS abertas, {done} concluidas
         </small>
       </div>
+    </>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <aside className="hidden w-[260px] shrink-0 flex-col gap-6 border-r border-line bg-panel/80 lg:flex">
+      <SidebarContent />
     </aside>
+  );
+}
+
+export function MobileSidebar() {
+  const { mobileSidebarOpen, setMobileSidebarOpen } = useUIStore();
+
+  return (
+    <AnimatePresence>
+      {mobileSidebarOpen && (
+        <>
+          <motion.div
+            key="overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <motion.aside
+            key="drawer"
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            className="fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col border-r border-line bg-panel shadow-xl lg:hidden"
+          >
+            <button
+              onClick={() => setMobileSidebarOpen(false)}
+              className="absolute right-3 top-3 rounded-full p-2 text-muted hover:text-ink"
+              aria-label="Fechar menu"
+            >
+              <X className="size-5" />
+            </button>
+            <SidebarContent onNavigate={() => setMobileSidebarOpen(false)} />
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

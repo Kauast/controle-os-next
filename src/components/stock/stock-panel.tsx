@@ -19,10 +19,11 @@ import {
 } from "@/components/ui/select";
 import { QrCode } from "./qr-code";
 import { access } from "@/lib/access";
-import type { Product } from "@/lib/types";
+import type { Product, Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useUIStore } from "@/store/use-ui-store";
+import { useProducts, useCreateProduct, useAdjustStock } from "@/hooks/useProducts";
 
 function stockStatus(p: Product) {
   if (p.qty <= p.min * 0.5) return { label: "Critico", pill: "red" as const };
@@ -42,9 +43,8 @@ const productSchema = z.object({
 });
 type ProductForm = z.input<typeof productSchema>;
 
-function ProductForm() {
-  const addProduct = useAppStore((s) => s.addProduct);
-  const role = useAppStore((s) => s.role);
+function ProductFormSection({ role }: { role: Role }) {
+  const createProduct = useCreateProduct();
   const {
     register,
     handleSubmit,
@@ -60,7 +60,7 @@ function ProductForm() {
   return (
     <form
       onSubmit={handleSubmit((data) => {
-        addProduct(productSchema.parse(data));
+        createProduct.mutate(productSchema.parse(data));
         reset({ name: "", sku: "", category: "", location: "", qty: 0, min: 1, cost: 0, price: 0 });
       })}
       className="rounded-[14px] border border-line bg-panel-soft/40 p-4"
@@ -105,35 +105,43 @@ function ProductForm() {
           <Input type="number" min={0} step="0.01" {...register("price")} />
         </Label>
       </div>
-      <Button type="submit" className="mt-3 w-full">
-        Cadastrar e gerar QR
+      <Button type="submit" className="mt-3 w-full" disabled={createProduct.isPending}>
+        {createProduct.isPending ? "Cadastrando..." : "Cadastrar e gerar QR"}
       </Button>
     </form>
   );
 }
 
-function MovementForms() {
+function MovementForms({ products }: { products: Product[] }) {
   const role = useAppStore((s) => s.role);
-  const registerMovement = useAppStore((s) => s.registerMovement);
+  const adjustStock = useAdjustStock();
+  const requests = useAppStore((s) => s.requests);
+  const reviewRequest = useAppStore((s) => s.reviewRequest);
   const [entry, setEntry] = useState({ id: "", qty: 1, reason: "" });
   const [exit, setExit] = useState({ id: "", qty: 1, reason: "venda" });
   const [msg, setMsg] = useState("");
 
   if (!access.stockWrite(role)) return null;
 
+  function findApiId(identifier: string): string | undefined {
+    const norm = identifier.trim().toLowerCase();
+    const found = products.find(
+      (p) => p.sku.toLowerCase() === norm || p.qr.toLowerCase() === norm || String(p.id) === norm,
+    );
+    return found?._apiId;
+  }
+
   return (
     <div className="grid gap-3 md:grid-cols-2" id="stock-movimento">
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const ok = registerMovement({
-            identifier: entry.id,
-            type: "entrada",
-            qty: Number(entry.qty),
-            reason: entry.reason || "reposicao",
-          });
-          setMsg(ok ? "Entrada registrada." : "Produto nao encontrado.");
-          if (ok) setEntry({ id: "", qty: 1, reason: "" });
+          const apiId = findApiId(entry.id);
+          if (!apiId) { setMsg("Produto nao encontrado."); return; }
+          adjustStock.mutate(
+            { apiId, quantity: Number(entry.qty), reason: entry.reason || "reposicao" },
+            { onSuccess: () => { setMsg("Entrada registrada."); setEntry({ id: "", qty: 1, reason: "" }); } }
+          );
         }}
         className="rounded-[14px] border border-line bg-panel-soft/40 p-4"
       >
@@ -159,21 +167,19 @@ function MovementForms() {
             Fornecedor / motivo
             <Input value={entry.reason} onChange={(e) => setEntry({ ...entry, reason: e.target.value })} />
           </Label>
-          <Button type="submit">Registrar entrada</Button>
+          <Button type="submit" disabled={adjustStock.isPending}>Registrar entrada</Button>
         </div>
       </form>
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const ok = registerMovement({
-            identifier: exit.id,
-            type: "saida",
-            qty: Number(exit.qty),
-            reason: exit.reason,
-          });
-          setMsg(ok ? "Saida registrada." : "Produto nao encontrado ou estoque insuficiente.");
-          if (ok) setExit({ id: "", qty: 1, reason: "venda" });
+          const apiId = findApiId(exit.id);
+          if (!apiId) { setMsg("Produto nao encontrado ou estoque insuficiente."); return; }
+          adjustStock.mutate(
+            { apiId, quantity: -Number(exit.qty), reason: exit.reason },
+            { onSuccess: () => { setMsg("Saida registrada."); setExit({ id: "", qty: 1, reason: "venda" }); } }
+          );
         }}
         className="rounded-[14px] border border-line bg-panel-soft/40 p-4"
       >
@@ -210,52 +216,42 @@ function MovementForms() {
               </SelectContent>
             </Select>
           </Label>
-          <Button type="submit">Registrar saida</Button>
+          <Button type="submit" disabled={adjustStock.isPending}>Registrar saida</Button>
         </div>
       </form>
       {msg && <p className="md:col-span-2 text-xs text-muted">{msg}</p>}
-    </div>
-  );
-}
 
-function MaterialRequests() {
-  const role = useAppStore((s) => s.role);
-  const requests = useAppStore((s) => s.requests);
-  const reviewRequest = useAppStore((s) => s.reviewRequest);
-  const pending = requests.filter((r) => r.status === "pendente");
-  const canReview = role === "admin" || role === "estoque";
-
-  return (
-    <div className="rounded-[14px] border border-line bg-panel-soft/40 p-4" id="stock-solicitacoes">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <span className="text-xs uppercase text-muted">Solicitacoes</span>
-          <strong className="block text-sm text-ink">Pedidos de material das equipes</strong>
+      <div className="md:col-span-2 rounded-[14px] border border-line bg-panel-soft/40 p-4" id="stock-solicitacoes">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs uppercase text-muted">Solicitacoes</span>
+            <strong className="block text-sm text-ink">Pedidos de material das equipes</strong>
+          </div>
+          <Badge tone="amber">{requests.filter((r) => r.status === "pendente").length} pendentes</Badge>
         </div>
-        <Badge tone="amber">{pending.length} pendentes</Badge>
-      </div>
-      <div className="flex flex-col gap-2">
-        {requests.length === 0 && <small className="text-muted">Nenhuma solicitacao pendente.</small>}
-        {requests.map((r) => (
-          <article key={r.id} className="rounded-[10px] border border-line bg-panel p-2.5">
-            <strong className="text-sm text-ink">
-              {r.qty}x {r.name}
-            </strong>
-            <small className="block text-xs text-muted">
-              {r.os} · {r.status} · {r.when}
-            </small>
-            {canReview && r.status === "pendente" && (
-              <div className="mt-2 flex gap-2">
-                <Button size="sm" variant="secondary" onClick={() => reviewRequest(r.id, "aprovado")}>
-                  Aprovar
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => reviewRequest(r.id, "reprovado")}>
-                  Reprovar
-                </Button>
-              </div>
-            )}
-          </article>
-        ))}
+        <div className="flex flex-col gap-2">
+          {requests.length === 0 && <small className="text-muted">Nenhuma solicitacao pendente.</small>}
+          {requests.map((r) => (
+            <article key={r.id} className="rounded-[10px] border border-line bg-panel p-2.5">
+              <strong className="text-sm text-ink">
+                {r.qty}x {r.name}
+              </strong>
+              <small className="block text-xs text-muted">
+                {r.os} · {r.status} · {r.when}
+              </small>
+              {(role === "admin" || role === "estoque") && r.status === "pendente" && (
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => reviewRequest(r.id, "aprovado")}>
+                    Aprovar
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => reviewRequest(r.id, "reprovado")}>
+                    Reprovar
+                  </Button>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -263,15 +259,20 @@ function MaterialRequests() {
 
 export function StockPanel() {
   const role = useAppStore((s) => s.role);
-  const products = useAppStore((s) => s.products);
-  const movements = useAppStore((s) => s.movements);
+  const { stockTarget } = useUIStore();
+  const { data: products = [], isLoading } = useProducts();
   const [selectedId, setSelectedId] = useState(1);
   const [scan, setScan] = useState("");
-  const { stockTarget } = useUIStore();
   const rootRef = useRef<HTMLDivElement>(null);
 
   const selected = products.find((p) => p.id === selectedId) ?? products[0];
-  const low = products.filter((p) => p.qty <= p.min);
+  const low = products.filter((p) => p.qty <= p.min && p.min > 0);
+
+  useEffect(() => {
+    if (products.length > 0 && !products.find((p) => p.id === selectedId)) {
+      setSelectedId(products[0].id);
+    }
+  }, [products, selectedId]);
 
   useEffect(() => {
     if (stockTarget) {
@@ -285,6 +286,14 @@ export function StockPanel() {
       (p) => p.sku.toLowerCase() === norm || p.qr.toLowerCase() === norm || String(p.id) === norm,
     );
     if (found) setSelectedId(found.id);
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <div className="py-16 text-center text-sm text-muted">Carregando produtos...</div>
+      </Card>
+    );
   }
 
   return (
@@ -305,7 +314,7 @@ export function StockPanel() {
         {[
           { label: "Itens cadastrados", value: products.length },
           { label: "Alertas", value: low.length },
-          { label: "Ultima movimentacao", value: movements[0]?.reason ?? "-" },
+          { label: "Ultimo produto", value: products[0]?.name ?? "-" },
         ].map((m) => (
           <div key={m.label} className="rounded-[12px] border border-line bg-panel-soft/40 p-3">
             <span className="text-xs text-muted">{m.label}</span>
@@ -355,67 +364,43 @@ export function StockPanel() {
                 </button>
               );
             })}
+            {products.length === 0 && (
+              <div className="py-8 text-center text-sm text-muted">
+                Nenhum produto cadastrado. Adicione um produto ao lado.
+              </div>
+            )}
           </div>
         </section>
 
         <aside className="flex flex-col gap-4">
           <div className="flex flex-col items-center gap-2 rounded-[14px] border border-line bg-panel-soft/40 p-4 text-center">
             <span className="self-start text-xs uppercase text-muted">Produto selecionado</span>
-            <strong className="self-start text-sm text-ink">{selected?.name}</strong>
+            <strong className="self-start text-sm text-ink">{selected?.name ?? "—"}</strong>
             <small className="self-start text-xs text-muted">
               {selected?.sku} · {selected?.location}
             </small>
             {selected && <QrCode value={selected.qr} />}
             <strong className="text-xs text-ink">{selected?.sku}</strong>
           </div>
-          <ProductForm />
+          <ProductFormSection role={role} />
         </aside>
       </div>
 
       <div className="mt-4 grid gap-4">
-        <MovementForms />
+        <MovementForms products={products} />
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-[14px] border border-line bg-panel-soft/40 p-4">
-            <strong className="mb-2 block text-sm text-ink">Estoque baixo</strong>
-            <div className="flex flex-col gap-2">
-              {low.map((p) => (
-                <div key={p.id} className="rounded-[10px] border border-line bg-panel p-2.5">
-                  <strong className="text-sm text-ink">{p.name}</strong>
-                  <small className="block text-xs text-muted">
-                    {p.qty} atual / minimo {p.min} · {p.location}
-                  </small>
-                </div>
-              ))}
-              {low.length === 0 && <small className="text-muted">Sem alertas.</small>}
-            </div>
-          </div>
-
-          <MaterialRequests />
-        </div>
-
-        <div className="rounded-[14px] border border-line bg-panel-soft/40 p-4" id="stock-historico">
-          <strong className="mb-2 block text-sm text-ink">Entradas e saidas recentes</strong>
+        <div className="rounded-[14px] border border-line bg-panel-soft/40 p-4">
+          <strong className="mb-2 block text-sm text-ink">Estoque baixo</strong>
           <div className="flex flex-col gap-2">
-            {movements.slice(0, 8).map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between rounded-[10px] border border-line bg-panel p-2.5"
-              >
-                <span>
-                  <strong className="text-sm text-ink">{m.product}</strong>
-                  <small className="block text-xs text-muted">
-                    {m.type} · {m.qty} un. · {m.reason}
-                  </small>
-                  <small className="block text-[11px] text-muted">
-                    {m.user} · {m.date}
-                  </small>
-                </span>
-                <strong className="text-sm text-ink">
-                  {m.before} → {m.after}
-                </strong>
+            {low.map((p) => (
+              <div key={p.id} className="rounded-[10px] border border-line bg-panel p-2.5">
+                <strong className="text-sm text-ink">{p.name}</strong>
+                <small className="block text-xs text-muted">
+                  {p.qty} atual / minimo {p.min} · {p.location}
+                </small>
               </div>
             ))}
+            {low.length === 0 && <small className="text-muted">Sem alertas.</small>}
           </div>
         </div>
       </div>

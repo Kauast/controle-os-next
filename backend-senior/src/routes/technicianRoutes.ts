@@ -10,6 +10,11 @@ export default async function technicianRoutes(app: FastifyInstance) {
   app.get('/', controller.list.bind(controller));
   app.get('/:id', controller.findById.bind(controller));
   app.post('/', { onRequest: authorize('ADMIN') }, controller.create.bind(controller));
+  app.put<{ Params: { id: string } }>(
+    '/:id',
+    { onRequest: authorize('ADMIN') },
+    controller.update.bind(controller)
+  );
   app.patch<{ Params: { id: string } }>(
     '/:id/deactivate',
     { onRequest: authorize('ADMIN') },

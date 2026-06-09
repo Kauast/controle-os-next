@@ -5,8 +5,12 @@ export const createProductSchema = z.object({
   name: z.string().min(2),
   sku: z.string().min(3),
   description: z.string().optional(),
+  category: z.string().optional().default(''),
+  location: z.string().optional().default(''),
   stockQuantity: z.number().int().min(0).default(0),
-  price: z.number().positive(),
+  minStock: z.number().int().min(0).default(0),
+  cost: z.number().min(0).default(0),
+  price: z.number().min(0).default(0),
 });
 
 export const adjustStockSchema = z.object({
@@ -25,7 +29,7 @@ export class ProductService {
 
   async list(filters: { page?: number; limit?: number; search?: string }) {
     const page = filters.page ?? 1;
-    const limit = Math.min(filters.limit ?? 10, 100);
+    const limit = Math.min(filters.limit ?? 100, 200);
     const skip = (page - 1) * limit;
 
     const where = filters.search
@@ -58,10 +62,11 @@ export class ProductService {
     });
   }
 
-  async lowStock(threshold = 5) {
-    return prisma.product.findMany({
-      where: { stockQuantity: { lte: threshold } },
+  async lowStock() {
+    const products = await prisma.product.findMany({
+      where: { minStock: { gt: 0 } },
       orderBy: { stockQuantity: 'asc' },
     });
+    return products.filter((p) => p.stockQuantity <= p.minStock);
   }
 }

@@ -9,6 +9,7 @@ import { TEAMS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
+import { useTechnicians } from "@/hooks/useTechnicians";
 import { STATUS_DOT } from "@/lib/constants";
 
 function DispatchCard({ code, client, time }: { code: string; client: string; time: string }) {
@@ -24,8 +25,8 @@ function DispatchCard({ code, client, time }: { code: string; client: string; ti
 export function DispatchBoard() {
   const role = useAppStore((s) => s.role);
   const activeTeam = useAppStore((s) => s.activeTeam);
-  const technicians = useAppStore((s) => s.technicians);
   const assignOrder = useAppStore((s) => s.assignOrder);
+  const { data: technicians = [] } = useTechnicians();
   const orders = useVisibleOrders();
   const [dragCode, setDragCode] = useState<string | null>(null);
   const [overTeam, setOverTeam] = useState<string | null>(null);

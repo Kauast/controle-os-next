@@ -9,10 +9,12 @@ interface UIState {
   newOsOpen: boolean;
   scheduleOpen: boolean;
   teamLoginOpen: boolean;
+  mobileSidebarOpen: boolean;
   setSection: (section: SectionKey, stockTarget?: string | null) => void;
   setNewOsOpen: (open: boolean) => void;
   setScheduleOpen: (open: boolean) => void;
   setTeamLoginOpen: (open: boolean) => void;
+  setMobileSidebarOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -21,8 +23,10 @@ export const useUIStore = create<UIState>((set) => ({
   newOsOpen: false,
   scheduleOpen: false,
   teamLoginOpen: false,
+  mobileSidebarOpen: false,
   setSection: (section, stockTarget = null) => set({ section, stockTarget }),
   setNewOsOpen: (open) => set({ newOsOpen: open }),
   setScheduleOpen: (open) => set({ scheduleOpen: open }),
   setTeamLoginOpen: (open) => set({ teamLoginOpen: open }),
+  setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
 }));

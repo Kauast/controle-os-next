@@ -5,12 +5,15 @@ import { access } from "@/lib/access";
 import { TEAMS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
+import { useProducts } from "@/hooks/useProducts";
+import { useTechnicians } from "@/hooks/useTechnicians";
 
 export function Metrics() {
   const role = useAppStore((s) => s.role);
   const orders = useAppStore((s) => s.orders);
-  const products = useAppStore((s) => s.products);
-  const technicians = useAppStore((s) => s.technicians);
+
+  const { data: products = [] } = useProducts();
+  const { data: technicians = [] } = useTechnicians();
 
   const emAndamento = orders.filter((o) => o.status !== "completed").length;
   const atrasadas = orders.filter((o) => o.status !== "completed" && o.priority === "high").length;
@@ -19,7 +22,7 @@ export function Metrics() {
     const busy = techs.find((t) => t.status && t.status !== "Disponivel");
     return !busy;
   }).length;
-  const critico = products.filter((p) => p.qty <= p.min).length;
+  const critico = products.filter((p) => p.qty <= p.min && p.min > 0).length;
 
   const cards = [
     { label: "OS em andamento", value: emAndamento, hint: `${atrasadas} com prioridade alta`, alert: false },

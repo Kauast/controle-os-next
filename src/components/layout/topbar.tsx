@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Download, LogIn, LogOut, Plus, Search } from "lucide-react";
+import { Download, LogIn, LogOut, Menu, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,7 @@ export function Topbar() {
   const setActiveTeam = useAppStore((s) => s.setActiveTeam);
   const setNewOsOpen = useUIStore((s) => s.setNewOsOpen);
   const setTeamLoginOpen = useUIStore((s) => s.setTeamLoginOpen);
+  const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const user = useAuthStore((s) => s.user);
 
   const copy = roleViewCopy[role];
@@ -42,9 +43,20 @@ export function Topbar() {
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-panel/70 px-4 py-3 backdrop-blur lg:px-7 lg:py-4">
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-muted sm:text-xs">{copy.context}</p>
-        <h1 className="truncate text-base font-bold text-ink sm:text-xl">{copy.title}</h1>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Button
+          variant="icon"
+          size="icon"
+          aria-label="Menu"
+          className="lg:hidden"
+          onClick={() => setMobileSidebarOpen(true)}
+        >
+          <Menu className="size-5" />
+        </Button>
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted sm:text-xs">{copy.context}</p>
+          <h1 className="truncate text-base font-bold text-ink sm:text-xl">{copy.title}</h1>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
