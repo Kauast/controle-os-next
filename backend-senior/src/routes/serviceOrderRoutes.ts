@@ -1,14 +1,29 @@
 import { FastifyInstance } from 'fastify';
 import { ServiceOrderController } from '../controllers/serviceOrderController';
-import { authenticate } from '../middlewares/auth';
+import { authenticate, authorize } from '../middlewares/auth';
 
 const controller = new ServiceOrderController();
 
 export default async function serviceOrderRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate);
 
-  app.post('/', controller.create.bind(controller));
-  app.get('/', controller.list.bind(controller));
-  app.get('/:id', controller.findById.bind(controller));
-  app.patch('/:id/status', controller.updateStatus.bind(controller));
+  app.get<{ Querystring: { status?: string; page?: string; limit?: string } }>(
+    '/',
+    controller.list.bind(controller)
+  );
+  app.get<{ Params: { id: string } }>(
+    '/:id',
+    controller.findById.bind(controller)
+  );
+  app.post(
+    '/',
+    { onRequest: authorize('ADMIN', 'ATTENDANT') },
+    controller.create.bind(controller)
+  );
+  // TECHNICIAN pode atualizar status (campo, checkin, progresso); FINANCIAL não altera OS
+  app.patch<{ Params: { id: string }; Body: { status: string; cancellationReason?: string } }>(
+    '/:id/status',
+    { onRequest: authorize('ADMIN', 'ATTENDANT', 'TECHNICIAN') },
+    controller.updateStatus.bind(controller)
+  );
 }

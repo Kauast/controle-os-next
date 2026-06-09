@@ -4,44 +4,50 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: controle_os
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-controle_os}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend-senior
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/controle_os
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-mude-em-producao-secret-muito-longo}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-controle_os}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
       PORT: 3333
       NODE_ENV: production
-      ALLOWED_ORIGINS: http://localhost:3000,${FRONTEND_URL:-http://localhost:3000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
       - "3333:3333"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     command: >
       sh -c "npx prisma migrate deploy && npm run start"
 
@@ -51,7 +57,7 @@ services:
       dockerfile: Dockerfile
     environment:
       BACKEND_URL: http://backend:3333
-      JWT_SECRET: ${JWT_SECRET:-mude-em-producao-secret-muito-longo}
+      JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
     ports:
       - "3000:3000"

@@ -9,10 +9,11 @@ export default async function productRoutes(app: FastifyInstance) {
 
   app.get('/', controller.list.bind(controller));
   app.get('/low-stock', controller.lowStock.bind(controller));
-  app.post('/', { onRequest: authorize('ADMIN', 'ATTENDANT') }, controller.create.bind(controller));
+  // Cadastro e ajuste de estoque são responsabilidade do STOCK
+  app.post('/', { onRequest: authorize('ADMIN', 'STOCK') }, controller.create.bind(controller));
   app.patch<{ Params: { id: string }; Body: { quantity: number; reason: string } }>(
     '/:id/stock',
-    { onRequest: authorize('ADMIN', 'ATTENDANT') },
+    { onRequest: authorize('ADMIN', 'STOCK') },
     controller.adjustStock.bind(controller)
   );
 }

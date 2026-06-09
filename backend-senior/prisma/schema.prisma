@@ -53,6 +53,15 @@ model ServiceOrder {
   totalAmount        Decimal    @default(0) @db.Decimal(10, 2)
   clientAuthorized   Boolean    @default(false)
   version            Int        @default(1)
+
+  // Campos de campo: técnico em rota
+  description        String?
+  checkinAt          DateTime?
+  checkoutAt         DateTime?
+  checkinLocation    String?    // "lat,lng" do GPS no check-in
+  photoUrls          String[]   @default([])
+  clientSignature    String?    // URL da assinatura digitalizada
+
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
