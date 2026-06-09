@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { ClientService, createClientSchema, updateClientSchema } from '../services/clientService';
+import { ClientService, createClientSchema, updateClientSchema, ImportClientInput } from '../services/clientService';
 
 const service = new ClientService();
 
@@ -8,6 +8,18 @@ export class ClientController {
     const data = createClientSchema.parse(request.body);
     const result = await service.create(data);
     return reply.status(201).send(result);
+  }
+
+  async importBatch(request: FastifyRequest, reply: FastifyReply) {
+    const { items } = request.body as { items: ImportClientInput[] };
+    if (!Array.isArray(items) || items.length === 0) {
+      return reply.status(400).send({ error: 'items deve ser um array não vazio' });
+    }
+    if (items.length > 2000) {
+      return reply.status(400).send({ error: 'Máximo de 2000 clientes por importação' });
+    }
+    const result = await service.importBatch(items);
+    return reply.send(result);
   }
 
   async list(

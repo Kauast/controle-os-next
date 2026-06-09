@@ -3,24 +3,75 @@ import { prisma } from '../lib/prisma';
 
 export const createClientSchema = z.object({
   name: z.string().min(2),
-  document: z.string().min(11).max(18),
+  document: z.string().min(3).max(30),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  address: z.string().optional(),
+  neighborhood: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().max(2).optional(),
+  contactName: z.string().optional(),
 });
 
 export const updateClientSchema = createClientSchema.partial().extend({
   isBlocked: z.boolean().optional(),
   blockedReason: z.string().optional(),
+  chipIds: z.array(z.string()).optional(),
+});
+
+const importClientSchema = z.object({
+  name: z.string().min(1),
+  document: z.string().min(1),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  neighborhood: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  contactName: z.string().optional(),
 });
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;
+export type ImportClientInput = z.infer<typeof importClientSchema>;
 
 export class ClientService {
   async create(data: CreateClientInput) {
     const existing = await prisma.client.findUnique({ where: { document: data.document } });
     if (existing) throw new Error('Documento já cadastrado');
     return prisma.client.create({ data });
+  }
+
+  async importBatch(items: ImportClientInput[]) {
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const item of items) {
+      try {
+        const validated = importClientSchema.parse(item);
+        const existing = await prisma.client.findUnique({ where: { document: validated.document } });
+        if (existing) {
+          skipped++;
+          continue;
+        }
+        await prisma.client.create({ data: validated });
+        created++;
+      } catch (e: unknown) {
+        errors.push(`${item.document}: ${e instanceof Error ? e.message : 'erro desconhecido'}`);
+      }
+    }
+
+    return { created, skipped, errors };
+  }
+
+  async addChipId(clientId: string, chipId: string) {
+    const client = await prisma.client.findUnique({ where: { id: clientId } });
+    if (!client) return;
+    if (client.chipIds.includes(chipId)) return;
+    await prisma.client.update({
+      where: { id: clientId },
+      data: { chipIds: { push: chipId } },
+    });
   }
 
   async list(filters: { page?: number; limit?: number; search?: string }) {
@@ -32,7 +83,8 @@ export class ClientService {
       ? {
           OR: [
             { name: { contains: filters.search, mode: 'insensitive' as const } },
-            { document: { contains: filters.search } },
+            { document: { contains: filters.search, mode: 'insensitive' as const } },
+            { phone: { contains: filters.search } },
           ],
         }
       : {};
@@ -48,7 +100,13 @@ export class ClientService {
   async findById(id: string) {
     const client = await prisma.client.findUnique({
       where: { id },
-      include: { serviceOrders: { orderBy: { createdAt: 'desc' }, take: 5 } },
+      include: {
+        serviceOrders: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: { technician: true },
+        },
+      },
     });
     if (!client) throw new Error('Cliente não encontrado');
     return client;

@@ -8,9 +8,24 @@ export interface Client {
   document: string;
   phone?: string;
   email?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  contactName?: string;
+  chipIds: string[];
   isBlocked: boolean;
   blockedReason?: string;
   createdAt: string;
+  serviceOrders?: Array<{
+    id: string;
+    number: number;
+    status: string;
+    description?: string;
+    chipId?: string;
+    createdAt: string;
+    technician?: { name: string } | null;
+  }>;
 }
 
 interface ClientsResponse {
@@ -24,11 +39,33 @@ interface CreateClientData {
   document: string;
   phone?: string;
   email?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  contactName?: string;
 }
 
 interface UpdateClientData extends Partial<CreateClientData> {
   isBlocked?: boolean;
   blockedReason?: string;
+}
+
+export interface ImportClientRow {
+  name: string;
+  document: string;
+  phone?: string;
+  address?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  contactName?: string;
+}
+
+export interface ImportResult {
+  created: number;
+  skipped: number;
+  errors: string[];
 }
 
 export function useClients(search?: string) {
@@ -67,6 +104,23 @@ export function useCreateClient() {
     },
     onError: (err: Error) => {
       toast.error(err.message || "Erro ao cadastrar cliente.");
+    },
+  });
+}
+
+export function useImportClients() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: ImportClientRow[]) => {
+      const { data } = await apiClient.post<ImportResult>("/clients/import", { items });
+      return data;
+    },
+    onSuccess: (result) => {
+      toast.success(`${result.created} clientes importados. ${result.skipped} já existiam.`);
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Erro ao importar clientes.");
     },
   });
 }

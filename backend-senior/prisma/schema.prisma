@@ -13,6 +13,12 @@ model Client {
   document      String    @unique
   phone         String?
   email         String?
+  address       String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  contactName   String?
+  chipIds       String[]  @default([])
   isBlocked     Boolean   @default(false)
   blockedReason String?
   createdAt     DateTime  @default(now())

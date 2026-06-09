@@ -20,6 +20,11 @@ export default async function clientRoutes(app: FastifyInstance) {
     { onRequest: authorize('ADMIN', 'ATTENDANT') },
     controller.create.bind(controller)
   );
+  app.post(
+    '/import',
+    { onRequest: authorize('ADMIN', 'ATTENDANT') },
+    controller.importBatch.bind(controller)
+  );
   app.put<{ Params: { id: string } }>(
     '/:id',
     { onRequest: authorize('ADMIN', 'ATTENDANT') },

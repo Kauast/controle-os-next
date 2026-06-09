@@ -1,5 +1,6 @@
 import { Priority, Status } from '@prisma/client';
 import dayjs from 'dayjs';
+import { ClientService } from './clientService';
 import {
   canTransition,
   createOSSchema,
@@ -103,7 +104,15 @@ export class ServiceOrderService {
         throw new Error('Conflito de concorrência. Tente novamente.');
       }
 
-      return tx.serviceOrder.findUnique({ where: { id } });
+      const finalOS = await tx.serviceOrder.findUnique({ where: { id } });
+
+      // Quando OS é concluída, salva o chipId no perfil do cliente
+      if (newStatus === 'COMPLETED' && os.chipId) {
+        const clientService = new ClientService();
+        await clientService.addChipId(os.clientId, os.chipId);
+      }
+
+      return finalOS;
     });
   }
 
