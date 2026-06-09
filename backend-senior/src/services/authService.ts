@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export const registerSchema = z.object({
   email: z.string().email(),

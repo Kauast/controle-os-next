@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export const createProductSchema = z.object({
   name: z.string().min(2),

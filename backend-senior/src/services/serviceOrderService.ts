@@ -1,10 +1,9 @@
-import { PrismaClient, Status } from '@prisma/client';
+import { Status } from '@prisma/client';
 import dayjs from 'dayjs';
 import { canTransition, createOSSchema, CreateOSInput } from '../lib/serviceOrderRules';
+import { prisma } from '../lib/prisma';
 
 export { createOSSchema, canTransition, type CreateOSInput };
-
-const prisma = new PrismaClient();
 
 export class ServiceOrderService {
   async create(data: CreateOSInput) {
