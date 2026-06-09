@@ -127,6 +127,7 @@ model User {
 
 enum Role {
   ADMIN
+  STOCK
   TECHNICIAN
   ATTENDANT
   FINANCIAL

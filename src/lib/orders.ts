@@ -33,16 +33,7 @@ export function orderLabel(o: ServiceOrder): { text: string; pill: "teal" | "amb
   return { text: "Agenda", pill: "teal" };
 }
 
-const fallbackDays: Record<string, string> = {
-  "OS-1048": "05",
-  "OS-1049": "05",
-  "OS-1050": "05",
-  "OS-1051": "07",
-  "OS-1052": "06",
-  "OS-1053": "09",
-  "OS-1054": "12",
-  "OS-1055": "18",
-};
+const fallbackDays: Record<string, string> = {};
 
 export function orderCalendarDate(o: ServiceOrder) {
   if (o.scheduledDate) return o.scheduledDate;

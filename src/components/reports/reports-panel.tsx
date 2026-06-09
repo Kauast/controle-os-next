@@ -15,11 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TEAMS } from "@/lib/types";
 import { useTeamReport } from "@/hooks/queries";
 
-const instructors = [
-  { name: "Administrador", instructed: 31, redirected: 4, pending: 2, last: "OS-1051 para Equipe 4" },
-  { name: "Supervisor Campo", instructed: 22, redirected: 3, pending: 1, last: "Checklist reforcado OS-1050" },
-  { name: "Plantao", instructed: 9, redirected: 2, pending: 0, last: "Apoio enviado para Equipe 5" },
-];
+const instructors: { name: string; instructed: number; redirected: number; pending: number; last: string }[] = [];
 
 export function ReportsPanel() {
   const [filter, setFilter] = useState("all");

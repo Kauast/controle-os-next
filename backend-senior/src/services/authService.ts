@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(['ADMIN', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL']).default('ATTENDANT'),
+  role: z.enum(['ADMIN', 'STOCK', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL']).default('ATTENDANT'),
 });
 
 export const loginSchema = z.object({

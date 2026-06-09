@@ -53,15 +53,10 @@ export async function fetchFinance(): Promise<FinanceSummary> {
   const products = useAppStore.getState().products;
   const stockValue = products.reduce((sum, p) => sum + p.cost * p.qty, 0);
   return delay({
-    materialSold: 34600,
-    servicesScheduled: 51800,
-    forecast: 86400,
+    materialSold: 0,
+    servicesScheduled: 0,
+    forecast: 0,
     stockValue,
-    monthly: [
-      { month: "Mar/2026", material: 27400, services: 44200, forecast: 71600, stock: 121300 },
-      { month: "Abr/2026", material: 31850, services: 48900, forecast: 80750, stock: 126700 },
-      { month: "Mai/2026", material: 29600, services: 46400, forecast: 76000, stock: 119500 },
-      { month: "Jun/2026", material: 34600, services: 51800, forecast: 86400, stock: stockValue },
-    ],
+    monthly: [],
   });
 }

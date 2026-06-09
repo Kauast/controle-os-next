@@ -16,7 +16,14 @@ export const prisma = new PrismaClient();
 const start = async () => {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true });
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:3000,http://localhost:3001').split(',');
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true,
+  });
   await app.register(helmet);
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(jwt, { secret: process.env.JWT_SECRET! });
