@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import dayjs from 'dayjs';
 import { prisma } from '../lib/prisma';
 
 export class ReportController {
@@ -39,44 +40,63 @@ export class ReportController {
   }
 
   async financeSummary(_request: FastifyRequest, reply: FastifyReply) {
-    const [products, serviceOrders] = await Promise.all([
-      prisma.product.findMany({ select: { stockQuantity: true, cost: true, price: true } }),
+    const sixMonthsAgo = dayjs().subtract(5, 'month').startOf('month').toDate();
+
+    const [products, completedOrders, openOrders] = await Promise.all([
+      prisma.product.findMany({ select: { stockQuantity: true, cost: true } }),
       prisma.serviceOrder.findMany({
-        where: { status: 'COMPLETED' },
+        where: { status: 'COMPLETED', completionDate: { gte: sixMonthsAgo } },
         include: { items: true },
-        orderBy: { completionDate: 'desc' },
+        orderBy: { completionDate: 'asc' },
+      }),
+      prisma.serviceOrder.findMany({
+        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] } },
+        include: { items: true },
       }),
     ]);
 
     const stockValue = products.reduce((sum, p) => sum + p.stockQuantity * Number(p.cost), 0);
 
-    const materialSold = serviceOrders.reduce((sum, os) => {
-      const mat = os.items
+    const materialSold = completedOrders.reduce((sum, os) => {
+      return sum + os.items
         .filter((i) => i.itemType === 'PRODUCT')
         .reduce((s, i) => s + i.quantity * Number(i.unitPrice), 0);
-      return sum + mat;
     }, 0);
 
-    const servicesScheduled = serviceOrders.reduce((sum, os) => {
-      const svc = os.items
+    const servicesScheduled = completedOrders.reduce((sum, os) => {
+      return sum + os.items
         .filter((i) => i.itemType === 'SERVICE')
         .reduce((s, i) => s + i.quantity * Number(i.unitPrice), 0);
-      return sum + svc;
     }, 0);
-
-    const openOrders = await prisma.serviceOrder.findMany({
-      where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] } },
-      include: { items: true },
-    });
 
     const forecast = openOrders.reduce((sum, os) => sum + Number(os.totalAmount), 0);
 
-    return reply.send({
-      materialSold,
-      servicesScheduled,
-      forecast,
-      stockValue,
-      monthly: [],
-    });
+    // Agrupa os últimos 6 meses
+    const monthlyMap = new Map<string, { material: number; services: number }>();
+    for (let i = 5; i >= 0; i--) {
+      monthlyMap.set(dayjs().subtract(i, 'month').format('YYYY-MM'), { material: 0, services: 0 });
+    }
+
+    for (const os of completedOrders) {
+      const key = dayjs(os.completionDate!).format('YYYY-MM');
+      const entry = monthlyMap.get(key);
+      if (!entry) continue;
+      entry.material += os.items
+        .filter((i) => i.itemType === 'PRODUCT')
+        .reduce((s, i) => s + i.quantity * Number(i.unitPrice), 0);
+      entry.services += os.items
+        .filter((i) => i.itemType === 'SERVICE')
+        .reduce((s, i) => s + i.quantity * Number(i.unitPrice), 0);
+    }
+
+    const monthly = Array.from(monthlyMap.entries()).map(([month, data]) => ({
+      month,
+      material: data.material,
+      services: data.services,
+      forecast: 0,
+      stock: stockValue,
+    }));
+
+    return reply.send({ materialSold, servicesScheduled, forecast, stockValue, monthly });
   }
 }

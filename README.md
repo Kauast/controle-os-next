@@ -41,7 +41,9 @@ Sistema de **ordens de serviço, estoque com QR Code, agenda por equipes e app d
 
 ### Variáveis de ambiente
 
-**`.env.local`** (raiz):
+Copie `.env.example` para `.env` na raiz e preencha os valores. Para desenvolvimento local, os valores padrão já funcionam.
+
+**`.env.local`** (raiz — Next.js):
 ```
 BACKEND_URL=http://localhost:3333
 JWT_SECRET=controle-os-jwt-secret-mude-em-producao
@@ -55,6 +57,11 @@ JWT_SECRET=controle-os-jwt-secret-mude-em-producao
 PORT=3333
 NODE_ENV=development
 ALLOWED_ORIGINS=http://localhost:3000
+SEED_ADMIN_PASS=admin123
+SEED_STOCK_PASS=estoque123
+SEED_TECH_PASS=tecnico123
+SEED_ATTENDANT_PASS=atend123
+SEED_FINANCIAL_PASS=financeiro123
 ```
 
 ### Subindo os serviços
@@ -66,8 +73,8 @@ docker-compose up -d postgres redis
 # 2. Backend
 cd backend-senior
 npm install
-npx prisma migrate dev
-npx tsx src/lib/seed-users.ts   # cria usuários demo (uma vez)
+npx prisma migrate deploy      # cria as tabelas
+npm run seed                   # cria usuários demo (uma vez)
 npm run dev
 
 # 3. Frontend (outra aba)
@@ -91,9 +98,24 @@ Acesse [http://localhost:3000](http://localhost:3000).
 ### Docker Compose (stack completa)
 
 ```bash
+# Copie e preencha as variáveis antes de subir
+cp .env.example .env
+# Edite .env com senhas reais e SEED_*_PASS
+
 docker-compose up -d
-docker-compose exec backend npx tsx src/lib/seed-users.ts
+# O backend já roda migrate + seed automaticamente na inicialização
 ```
+
+### Deploy em produção
+
+1. Copie `.env.example` para `.env` e gere senhas seguras:
+   ```bash
+   openssl rand -base64 32  # para POSTGRES_PASSWORD e REDIS_PASSWORD
+   openssl rand -base64 64  # para JWT_SECRET
+   ```
+2. Defina `ALLOWED_ORIGINS` com o domínio real do frontend.
+3. Defina `SEED_*_PASS` com as senhas que os usuários vão usar.
+4. Execute `docker-compose up -d`.
 
 ## Estrutura
 

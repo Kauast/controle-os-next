@@ -12,7 +12,7 @@ export function authorize(...roles: string[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const user = request.user as { role: string } | undefined;
     if (!user || !roles.includes(user.role)) {
-      reply.status(403).send({ error: 'Acesso negado' });
+      return reply.status(403).send({ error: 'Acesso negado' });
     }
   };
 }

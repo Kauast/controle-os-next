@@ -41,6 +41,11 @@ services:
       PORT: 3333
       NODE_ENV: production
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      SEED_ADMIN_PASS: ${SEED_ADMIN_PASS}
+      SEED_STOCK_PASS: ${SEED_STOCK_PASS}
+      SEED_TECH_PASS: ${SEED_TECH_PASS}
+      SEED_ATTENDANT_PASS: ${SEED_ATTENDANT_PASS}
+      SEED_FINANCIAL_PASS: ${SEED_FINANCIAL_PASS}
     ports:
       - "3333:3333"
     depends_on:
@@ -49,7 +54,7 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "npx prisma migrate deploy && npm run start"
+      sh -c "npx prisma migrate deploy && npm run seed && npm run start"
 
   frontend:
     build:
