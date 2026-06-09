@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Client {
+  id            String    @id @default(cuid())
+  name          String
+  document      String    @unique
+  phone         String?
+  email         String?
+  isBlocked     Boolean   @default(false)
+  blockedReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  serviceOrders ServiceOrder[]
+  payments      Payment[]
+}
+
+model Technician {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  name            String
+  specialty       String?
+  maxConcurrentOS Int      @default(5)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  serviceOrders ServiceOrder[]
+}
+
+model ServiceOrder {
+  id                 String     @id @default(cuid())
+  number             Int        @unique @default(autoincrement())
+  clientId           String
+  client             Client     @relation(fields: [clientId], references: [id])
+  technicianId       String?
+  technician         Technician? @relation(fields: [technicianId], references: [id])
+  status             Status     @default(OPEN)
+  openingDate        DateTime   @default(now())
+  dueDate            DateTime
+  startDate          DateTime?
+  completionDate     DateTime?
+  cancellationReason String?
+  totalAmount        Decimal    @default(0) @db.Decimal(10, 2)
+  clientAuthorized   Boolean    @default(false)
+  version            Int        @default(1)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  items    OSItem[]
+  payments Payment[]
+}
+
+enum Status {
+  OPEN
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+model OSItem {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  productId      String?
+  product        Product?     @relation(fields: [productId], references: [id])
+  description    String
+  quantity       Int          @default(1)
+  unitPrice      Decimal      @db.Decimal(10, 2)
+  itemType       ItemType     @default(SERVICE)
+  createdAt      DateTime     @default(now())
+}
+
+enum ItemType {
+  PRODUCT
+  SERVICE
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  sku           String   @unique
+  description   String?
+  stockQuantity Int      @default(0)
+  price         Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items OSItem[]
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder  @relation(fields: [serviceOrderId], references: [id])
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  amount         Decimal       @db.Decimal(10, 2)
+  dueDate        DateTime
+  paidAt         DateTime?
+  status         PaymentStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(ATTENDANT)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  TECHNICIAN
+  ATTENDANT
+  FINANCIAL
+}
