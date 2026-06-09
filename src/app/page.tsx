@@ -81,7 +81,7 @@ export default function Home() {
   const current = canAccessSection(section, role) ? section : defaultSection(role);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen overflow-x-hidden">
       <Sidebar />
       <main className="flex min-w-0 flex-1 flex-col">
         <Topbar />

@@ -46,7 +46,7 @@ export function TrackingPanel() {
       </SectionHeading>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <section className="relative h-[360px] overflow-hidden rounded-[16px] border border-line bg-[linear-gradient(135deg,#eef2f4,#e3edeb)]">
+        <section className="relative h-[240px] overflow-hidden rounded-[16px] border border-line bg-[linear-gradient(135deg,#eef2f4,#e3edeb)] sm:h-[360px]">
           <div className="absolute left-0 top-1/2 h-2 w-full -translate-y-1/2 bg-silver/40" />
           <div className="absolute left-1/3 top-0 h-full w-2 bg-silver/40" />
           <div className="absolute right-1/4 top-0 h-full w-1.5 bg-silver/30" />

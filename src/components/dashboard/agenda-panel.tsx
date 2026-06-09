@@ -80,9 +80,9 @@ function MonthCalendar() {
         </div>
         <Badge tone="teal">{orders.length} OS</Badge>
       </div>
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1">
         {week.map((d) => (
-          <div key={d} className="py-1 text-center text-[10px] font-semibold uppercase text-muted">
+          <div key={d} className="py-1 text-center text-[9px] font-semibold uppercase text-muted sm:text-[10px]">
             {d}
           </div>
         ))}
@@ -99,15 +99,15 @@ function MonthCalendar() {
             <div
               key={date}
               className={cn(
-                "flex min-h-[52px] flex-col rounded-[8px] border border-line p-1.5 text-left",
+                "flex min-h-[38px] flex-col rounded-[6px] border border-line p-1 text-left sm:min-h-[52px] sm:rounded-[8px] sm:p-1.5",
                 dayOrders.length && "bg-panel",
                 hasHigh && "border-red/50 bg-red-soft/40",
                 hasWarn && !hasHigh && "border-amber/50 bg-amber-soft/40",
               )}
             >
-              <strong className="text-xs text-ink">{day}</strong>
-              <span className="text-[9px] text-muted">
-                {dayOrders.length ? `${dayOrders.length} OS` : "Livre"}
+              <strong className="text-[10px] text-ink sm:text-xs">{day}</strong>
+              <span className="text-[8px] text-muted sm:text-[9px]">
+                {dayOrders.length ? `${dayOrders.length} OS` : ""}
               </span>
             </div>
           );

@@ -59,7 +59,7 @@ export function TeamsPanel() {
     <Card>
       <SectionHeading eyebrow="Campo" title="Status das equipes e tecnicos" />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5">
         {TEAMS.map((team) => {
           const techs = technicians.filter((t) => t.team === team);
           const status = techs.find((t) => t.status !== "Disponivel")?.status ?? "Disponivel";

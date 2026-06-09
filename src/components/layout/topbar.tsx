@@ -41,19 +41,19 @@ export function Topbar() {
   }
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-panel/70 px-5 py-4 backdrop-blur lg:px-7">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted">{copy.context}</p>
-        <h1 className="text-xl font-bold text-ink">{copy.title}</h1>
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-panel/70 px-4 py-3 backdrop-blur lg:px-7 lg:py-4">
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-muted sm:text-xs">{copy.context}</p>
+        <h1 className="truncate text-base font-bold text-ink sm:text-xl">{copy.title}</h1>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex items-center gap-2">
         {/* Seletor de perfil visível apenas em desenvolvimento */}
         {isDev && (
-          <Label className="text-[10px]">
+          <Label className="hidden text-[10px] sm:block">
             Perfil (dev)
             <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-              <SelectTrigger className="h-9 w-[150px]">
+              <SelectTrigger className="h-9 w-[130px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -71,7 +71,7 @@ export function Topbar() {
           <Label className="text-[10px]">
             Equipe
             <Select value={activeTeam} onValueChange={setActiveTeam}>
-              <SelectTrigger className="h-9 w-[130px]">
+              <SelectTrigger className="h-9 w-[110px] sm:w-[130px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -88,19 +88,25 @@ export function Topbar() {
         <Button variant="icon" size="icon" aria-label="Pesquisar">
           <Search />
         </Button>
-        <Button variant="secondary">
+
+        {/* Botões secundários — visíveis só em telas maiores */}
+        <Button variant="secondary" className="hidden sm:inline-flex">
           <Download /> Exportar
         </Button>
-        <Button variant="secondary" onClick={() => setTeamLoginOpen(true)}>
+        <Button variant="secondary" className="hidden sm:inline-flex" onClick={() => setTeamLoginOpen(true)}>
           <LogIn /> Conta equipe
         </Button>
+
+        {/* Nova OS — visível em mobile também */}
         {role !== "estoque" && role !== "tecnico" && (
           <Button onClick={() => setNewOsOpen(true)}>
-            <Plus /> Nova OS
+            <Plus />
+            <span className="hidden sm:inline">Nova OS</span>
           </Button>
         )}
 
-        <span className="rounded-full bg-panel-soft px-3 py-1.5 text-xs font-semibold text-muted">
+        {/* E-mail do usuário — oculto em mobile */}
+        <span className="hidden rounded-full bg-panel-soft px-3 py-1.5 text-xs font-semibold text-muted sm:block">
           {user?.email ?? ROLE_LABELS[role]}
         </span>
 

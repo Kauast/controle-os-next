@@ -301,7 +301,7 @@ export function StockPanel() {
         </p>
       )}
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { label: "Itens cadastrados", value: products.length },
           { label: "Alertas", value: low.length },

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -11,12 +11,18 @@ export const metadata: Metadata = {
     "Sistema de ordens de servico, estoque com QR Code, agenda por equipes e app do tecnico.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${inter.variable} overflow-x-hidden antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

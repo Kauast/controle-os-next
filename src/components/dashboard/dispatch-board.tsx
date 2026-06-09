@@ -88,7 +88,7 @@ export function DispatchBoard() {
         <section
           className={cn(
             "grid gap-2.5",
-            technicianView ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-5",
+            technicianView ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5",
           )}
         >
           {visibleTeams.map((team) => {

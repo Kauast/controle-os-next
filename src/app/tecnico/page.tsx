@@ -111,7 +111,7 @@ export default function TecnicoPage() {
       </header>
 
       <div className="flex flex-col gap-4 p-4">
-        <section className="grid grid-cols-4 gap-2">
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
             { label: "OS do dia", value: teamOrders.length },
             { label: "Pendentes", value: teamOrders.filter((o) => o.status !== "completed").length },
@@ -288,7 +288,7 @@ export default function TecnicoPage() {
                     min={1}
                     value={reqQty}
                     onChange={(e) => setReqQty(Math.max(1, Number(e.target.value)))}
-                    className="w-24"
+                    className="w-20 sm:w-24"
                   />
                   <Button
                     className="flex-1"

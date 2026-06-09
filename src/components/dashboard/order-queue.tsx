@@ -26,7 +26,7 @@ export function OrderQueue() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.03 }}
             className={cn(
-              "grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-[12px] border border-line bg-panel-soft/40 p-3",
+              "grid grid-cols-[56px_1fr] items-center gap-2 rounded-[12px] border border-line bg-panel-soft/40 p-3 sm:grid-cols-[64px_1fr_auto] sm:gap-3",
               toneBorder[orderTone(o)],
             )}
           >
@@ -34,8 +34,11 @@ export function OrderQueue() {
             <div className="min-w-0">
               <strong className="block truncate text-sm text-ink">{o.client}</strong>
               <span className="block truncate text-xs text-muted">{o.description}</span>
+              <small className="block truncate text-xs text-muted sm:hidden">
+                {o.tech || o.team} · {o.time}
+              </small>
             </div>
-            <small className="whitespace-nowrap text-xs text-muted">
+            <small className="hidden whitespace-nowrap text-xs text-muted sm:block">
               {o.tech || o.team} · {o.time}
             </small>
           </motion.article>
