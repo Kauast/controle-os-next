@@ -9,14 +9,7 @@ import { TEAMS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
-
-const statusDot: Record<string, string> = {
-  "Em atendimento": "bg-teal",
-  "A caminho": "bg-amber",
-  "Em rota": "bg-teal",
-  Agendada: "bg-amber",
-  Disponivel: "bg-teal",
-};
+import { STATUS_DOT } from "@/lib/constants";
 
 function DispatchCard({ code, client, time }: { code: string; client: string; time: string }) {
   return (
@@ -118,7 +111,7 @@ export function DispatchBoard() {
                 <div className="leading-tight">
                   <strong className="flex items-center gap-1.5 text-sm text-ink">
                     {team}
-                    <span className={cn("size-2 rounded-full", statusDot[status] ?? "bg-teal")} />
+                    <span className={cn("size-2 rounded-full", STATUS_DOT[status] ?? "bg-teal")} />
                   </strong>
                   <span className="block text-[11px] text-muted">{teamMembers(team)}</span>
                   <small className="text-[11px] text-muted">{status}</small>

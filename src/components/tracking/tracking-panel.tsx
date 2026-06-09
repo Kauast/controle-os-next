@@ -10,15 +10,9 @@ import { access } from "@/lib/access";
 import { sortOrders } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
+import { statusTone } from "@/lib/constants";
 
 const teamColor = ["bg-teal", "bg-amber", "bg-[#6b5bd2]", "bg-[#2f8fd0]", "bg-red"];
-
-function tone(status: string): "teal" | "amber" | "red" {
-  const s = status.toLowerCase();
-  if (s.includes("offline")) return "red";
-  if (s.includes("caminho") || s.includes("rota") || s.includes("agendada")) return "amber";
-  return "teal";
-}
 
 export function TrackingPanel() {
   const role = useAppStore((s) => s.role);
@@ -102,7 +96,7 @@ export function TrackingPanel() {
               >
                 <div className="flex items-center justify-between">
                   <strong className="text-sm text-ink">{l.team}</strong>
-                  <Badge tone={tone(st)}>{st}</Badge>
+                  <Badge tone={statusTone(st)}>{st}</Badge>
                 </div>
                 <span className="block text-xs text-muted">{members(l.team)}</span>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">

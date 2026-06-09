@@ -58,7 +58,7 @@ export default function TecnicoPage() {
   }
 
   const teamOrders = orders.filter((o) => o.team === activeTeam);
-  const activeOrder = orders.find((o) => o.code === "OS-1048") ?? teamOrders[0];
+  const activeOrder = teamOrders.find((o) => o.status !== "completed") ?? teamOrders[0];
   const photoCount = PHOTO_SLOTS.filter((p) => photos[p.slot]).length;
   const chipOk = !!chipId && chipId.replace(/\D/g, "").length >= 10;
   const requirements = [
