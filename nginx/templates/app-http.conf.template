@@ -1,17 +1,16 @@
-# Modo HTTP — usado antes de obter o certificado SSL
-# Após rodar setup-ssl.sh o nginx troca automaticamente para HTTPS
-
 server {
     listen 80;
     server_name ${DOMAIN};
 
-    # Desafio ACME (Let's Encrypt)
+    resolver 127.0.0.11 valid=30s;
+
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     location / {
-        proxy_pass         http://frontend:3000;
+        set $upstream frontend:3000;
+        proxy_pass http://$upstream;
         proxy_http_version 1.1;
         proxy_set_header   Upgrade     $http_upgrade;
         proxy_set_header   Connection  "upgrade";

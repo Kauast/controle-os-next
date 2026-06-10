@@ -203,3 +203,20 @@ export function useUpdateExecution() {
     },
   });
 }
+
+export function useDeleteServiceOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.delete(`/service-orders/${id}`);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("OS excluída com sucesso.");
+      qc.invalidateQueries({ queryKey: ["service-orders"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Erro ao excluir OS.");
+    },
+  });
+}

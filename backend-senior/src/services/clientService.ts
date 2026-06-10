@@ -79,7 +79,7 @@ export class ClientService {
       : {};
 
     const [clients, total] = await Promise.all([
-      prisma.client.findMany({ where, skip, take: limit, orderBy: { name: 'asc' } }),
+      prisma.client.findMany({ where, skip, take: limit, orderBy: { name: 'asc' }, include: { chips: { select: { id: true, status: true } } } }),
       prisma.client.count({ where }),
     ]);
 

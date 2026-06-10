@@ -19,15 +19,15 @@ import { TEAMS } from "@/lib/types";
 import { currentDateValue } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useUIStore } from "@/store/use-ui-store";
+import { useClients } from "@/hooks/useClients";
+import { useCreateServiceOrder } from "@/hooks/useServiceOrders";
 
 const schema = z.object({
-  code: z.string().min(1),
   scheduledDate: z.string().min(1, "Informe a data"),
   time: z.string().min(1),
   team: z.string().min(1),
-  client: z.string().min(2, "Informe o cliente"),
-  tech: z.string().optional(),
-  priority: z.enum(["normal", "warning", "high"]),
+  clientId: z.string().min(1, "Selecione um cliente"),
+  priority: z.enum(["NORMAL", "WARNING", "HIGH"]),
   description: z.string().min(2, "Descreva o servico"),
 });
 type Form = z.infer<typeof schema>;
@@ -36,21 +36,20 @@ export function ScheduleDialog() {
   const open = useUIStore((s) => s.scheduleOpen);
   const setOpen = useUIStore((s) => s.setScheduleOpen);
   const activeTeam = useAppStore((s) => s.activeTeam);
-  const orders = useAppStore((s) => s.orders);
-  const addOrder = useAppStore((s) => s.addOrder);
-  const nextOrderCode = useAppStore((s) => s.nextOrderCode);
-  const [error, setError] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+
+  const { data: clientsData } = useClients(clientSearch);
+  const clients = clientsData?.clients ?? [];
+  const createOS = useCreateServiceOrder();
 
   const { register, handleSubmit, reset, setValue, watch, formState } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: {
-      code: "",
       scheduledDate: currentDateValue(),
       time: "09:00",
       team: activeTeam,
-      client: "",
-      tech: "",
-      priority: "normal",
+      clientId: "",
+      priority: "NORMAL",
       description: "",
     },
   });
@@ -58,33 +57,32 @@ export function ScheduleDialog() {
   useEffect(() => {
     if (open) {
       reset({
-        code: nextOrderCode(),
         scheduledDate: currentDateValue(),
         time: "09:00",
         team: activeTeam,
-        client: "",
-        tech: "",
-        priority: "normal",
+        clientId: "",
+        priority: "NORMAL",
         description: "",
       });
-      setError("");
+      setClientSearch("");
     }
-  }, [open, reset, nextOrderCode, activeTeam]);
+  }, [open, reset, activeTeam]);
 
   function submit(data: Form) {
-    const code = data.code.toUpperCase();
-    if (orders.some((o) => o.code === code)) {
-      setError("Ja existe uma OS com esse numero.");
-      return;
-    }
-    addOrder({
-      ...data,
-      code,
-      tech: data.tech ?? "",
-      status: "scheduled",
-      scheduledMonth: data.scheduledDate.slice(0, 7),
-    });
-    setOpen(false);
+    const dueDate = new Date(`${data.scheduledDate}T${data.time}:00`).toISOString();
+    createOS.mutate(
+      {
+        clientId: data.clientId,
+        dueDate,
+        team: data.team,
+        priority: data.priority,
+        scheduledTime: data.time,
+        description: data.description,
+      },
+      {
+        onSuccess: () => setOpen(false),
+      }
+    );
   }
 
   return (
@@ -125,35 +123,62 @@ export function ScheduleDialog() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="warning">Media</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
+                <SelectItem value="NORMAL">Normal</SelectItem>
+                <SelectItem value="WARNING">Media</SelectItem>
+                <SelectItem value="HIGH">Alta</SelectItem>
               </SelectContent>
             </Select>
           </Label>
-          <Label>
-            Cliente
-            <Input {...register("client")} placeholder="Nome do cliente" />
-          </Label>
-          <Label>
-            Tecnico
-            <Input {...register("tech")} placeholder="Responsavel" />
-          </Label>
+
+          <div className="col-span-2 flex flex-col gap-1">
+            <span className="text-sm font-medium">Cliente</span>
+            <Input
+              placeholder="Buscar cliente..."
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+            />
+            <Select
+              value={watch("clientId")}
+              onValueChange={(v) => setValue("clientId", v, { shouldValidate: true })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                    {c.city ? ` — ${c.city}` : ""}
+                  </SelectItem>
+                ))}
+                {clients.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    {clientSearch ? "Nenhum cliente encontrado" : "Digite para buscar"}
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            {formState.errors.clientId && (
+              <span className="text-[10px] text-red">{formState.errors.clientId.message}</span>
+            )}
+          </div>
+
           <Label className="col-span-2">
             Descricao
             <Input {...register("description")} placeholder="Servico a executar" />
           </Label>
 
-          {(formState.errors.client || formState.errors.description || formState.errors.scheduledDate) && (
-            <p className="col-span-2 text-xs text-red">Preencha os campos obrigatorios.</p>
+          {formState.errors.description && (
+            <p className="col-span-2 text-xs text-red">{formState.errors.description.message}</p>
           )}
-          {error && <p className="col-span-2 text-xs text-red">{error}</p>}
 
           <div className="col-span-2 flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Agendar OS</Button>
+            <Button type="submit" disabled={createOS.isPending}>
+              {createOS.isPending ? "Agendando..." : "Agendar OS"}
+            </Button>
           </div>
         </form>
       </DialogContent>

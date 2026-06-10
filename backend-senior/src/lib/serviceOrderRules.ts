@@ -2,9 +2,9 @@ import { Status } from '@prisma/client';
 import { z } from 'zod';
 
 export const createOSSchema = z.object({
-  clientId: z.string().cuid(),
+  clientId: z.string().min(1),
   dueDate: z.string().datetime(),
-  technicianId: z.string().cuid().optional(),
+  technicianId: z.string().min(1).optional(),
   description: z.string().optional(),
   team: z.string().optional(),
   priority: z.enum(['NORMAL', 'WARNING', 'HIGH']).optional(),
@@ -15,7 +15,7 @@ export const createOSSchema = z.object({
       quantity: z.number().int().positive(),
       unitPrice: z.number().positive(),
       itemType: z.enum(['PRODUCT', 'SERVICE']),
-      productId: z.string().cuid().optional(),
+      productId: z.string().min(1).optional(),
     })
   ).default([]),
 });

@@ -7,6 +7,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          Role      @default(ATTENDANT)
+  active        Boolean   @default(true)
+  loginAttempts Int       @default(0)
+  lockedUntil   DateTime?
+  createdAt     DateTime  @default(now())
+
+  passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  userEmail String?
+  action    String
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
 model Client {
   id            String    @id @default(cuid())
   name          String
@@ -86,12 +122,10 @@ model ServiceOrder {
   clientAuthorized   Boolean    @default(false)
   version            Int        @default(1)
 
-  // Despacho e prioridade
   team               String     @default("Sem equipe")
   priority           Priority   @default(NORMAL)
-  scheduledTime      String?    // "HH:mm" para o dispatch board
+  scheduledTime      String?
 
-  // Campos de campo: técnico em rota
   description        String?
   checkinAt          DateTime?
   checkoutAt         DateTime?
@@ -223,17 +257,9 @@ enum PaymentStatus {
   CANCELLED
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  role      Role     @default(ATTENDANT)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-}
-
 enum Role {
   ADMIN
+  SUPERVISOR
   STOCK
   TECHNICIAN
   ATTENDANT

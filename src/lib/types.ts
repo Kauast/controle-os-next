@@ -1,9 +1,10 @@
-export type Role = "admin" | "estoque" | "tecnico" | "atendimento";
+export type Role = "admin" | "estoque" | "tecnico" | "atendimento" | "financeiro";
 
 export type Priority = "normal" | "warning" | "high";
-export type OrderStatus = "pending" | "scheduled" | "completed";
+export type OrderStatus = "pending" | "scheduled" | "completed" | "cancelled";
 
 export interface ServiceOrder {
+  _backendId?: string;
   code: string;
   client: string;
   description: string;
@@ -15,12 +16,11 @@ export interface ServiceOrder {
   scheduledDate?: string;
   scheduledMonth?: string;
   completedAt?: string;
-  _backendId?: string;
 }
 
 export interface Product {
-  id: number;
   _apiId?: string;
+  id: number;
   name: string;
   sku: string;
   category: string;
@@ -59,7 +59,6 @@ export interface MaterialRequest {
 
 export interface Technician {
   id: number;
-  _apiId?: string;
   name: string;
   phone: string;
   status: string;
@@ -99,6 +98,7 @@ export const TEAMS = [
 ] as const;
 
 export const ROLE_LABELS: Record<Role, string> = {
+  financeiro: "Financeiro",
   admin: "Administrador",
   estoque: "Estoque",
   tecnico: "Tecnico",

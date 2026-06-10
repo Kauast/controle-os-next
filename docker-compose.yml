@@ -1,7 +1,4 @@
-version: "3.8"
-
 services:
-  # ── Banco de dados ──────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -19,7 +16,6 @@ services:
     networks:
       - app
 
-  # ── Cache / filas ───────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -39,7 +35,6 @@ services:
     networks:
       - app
 
-  # ── Backend (Fastify) ───────────────────────────────────────────
   backend:
     build:
       context: ./backend-senior
@@ -69,15 +64,14 @@ services:
     command: >
       sh -c "npx prisma migrate deploy && npm run seed && npm run start"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3333/health || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 3333 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
     networks:
       - app
 
-  # ── Frontend (Next.js) ──────────────────────────────────────────
   frontend:
     build:
       context: .
@@ -89,25 +83,24 @@ services:
       NODE_ENV: production
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget --spider -q http://0.0.0.0:3000 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 120s
     networks:
       - app
 
-  # ── Nginx (reverse proxy + SSL) ─────────────────────────────────
   nginx:
     image: nginx:1.25-alpine
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-      - "3001:3001"   # Uptime Kuma
-      - "3200:3200"   # Grafana
+      - "3001:3001"
+      - "3200:3200"
     environment:
       DOMAIN: ${DOMAIN}
     volumes:
@@ -119,11 +112,11 @@ services:
       - ./uploads:/app/uploads:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     depends_on:
-      - frontend
+      frontend:
+        condition: service_healthy
     networks:
       - app
 
-  # ── Uptime Kuma (monitoramento de uptime) ──────────────────────
   uptime-kuma:
     image: louislam/uptime-kuma:1
     restart: unless-stopped
@@ -132,7 +125,6 @@ services:
     networks:
       - app
 
-  # ── Prometheus (coleta de métricas) ────────────────────────────
   prometheus:
     image: prom/prometheus:v2.51.2
     restart: unless-stopped
@@ -147,7 +139,6 @@ services:
     networks:
       - app
 
-  # ── Node Exporter (CPU, RAM, disco da VPS) ─────────────────────
   node-exporter:
     image: prom/node-exporter:v1.8.1
     restart: unless-stopped
@@ -163,7 +154,6 @@ services:
     networks:
       - app
 
-  # ── PostgreSQL Exporter ─────────────────────────────────────────
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
     restart: unless-stopped
@@ -175,7 +165,6 @@ services:
     networks:
       - app
 
-  # ── Redis Exporter ──────────────────────────────────────────────
   redis-exporter:
     image: oliver006/redis_exporter:v1.61.0
     restart: unless-stopped
@@ -187,7 +176,6 @@ services:
     networks:
       - app
 
-  # ── Grafana (dashboards de métricas) ───────────────────────────
   grafana:
     image: grafana/grafana:11.0.0
     restart: unless-stopped
@@ -205,7 +193,6 @@ services:
     networks:
       - app
 
-  # ── Certbot (renovação automática SSL) ─────────────────────────
   certbot:
     image: certbot/certbot:latest
     restart: unless-stopped
@@ -221,7 +208,6 @@ services:
         done
       "
 
-  # ── Backup automático do PostgreSQL ────────────────────────────
   backup:
     image: prodrigestivill/postgres-backup-local:16
     restart: unless-stopped

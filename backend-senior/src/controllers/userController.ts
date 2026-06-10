@@ -1,12 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import {
-  UserService,
-  createUserSchema,
-  updateUserSchema,
-  resetPasswordSchema,
-} from '../services/userService';
+import { UserService, createUserSchema, updateUserSchema, resetPasswordSchema } from '../services/userService';
 
 const service = new UserService();
+type AuthUser = { id: string; email: string; role: string };
 
 export class UserController {
   async list(_request: FastifyRequest, reply: FastifyReply) {
@@ -15,33 +11,26 @@ export class UserController {
 
   async create(request: FastifyRequest, reply: FastifyReply) {
     const data = createUserSchema.parse(request.body);
-    const user = await service.create(data);
-    return reply.status(201).send(user);
+    const req = request.user as AuthUser;
+    return reply.status(201).send(await service.create(data, req.id, req.email));
   }
 
-  async update(
-    request: FastifyRequest<{ Params: { id: string } }>,
-    reply: FastifyReply,
-  ) {
+  async update(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
     const data = updateUserSchema.parse(request.body);
-    return reply.send(await service.update(request.params.id, data));
+    const req = request.user as AuthUser;
+    return reply.send(await service.update(request.params.id, data, req.id, req.email));
   }
 
-  async resetPassword(
-    request: FastifyRequest<{ Params: { id: string } }>,
-    reply: FastifyReply,
-  ) {
+  async resetPassword(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
     const { password } = resetPasswordSchema.parse(request.body);
-    await service.resetPassword(request.params.id, password);
+    const req = request.user as AuthUser;
+    await service.resetPassword(request.params.id, password, req.id, req.email);
     return reply.send({ ok: true });
   }
 
-  async remove(
-    request: FastifyRequest<{ Params: { id: string } }>,
-    reply: FastifyReply,
-  ) {
-    const requester = request.user as { id: string };
-    await service.remove(request.params.id, requester.id);
+  async remove(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const req = request.user as AuthUser;
+    await service.remove(request.params.id, req.id, req.email);
     return reply.status(204).send();
   }
 }

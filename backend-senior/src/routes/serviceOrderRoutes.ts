@@ -8,7 +8,7 @@ export default async function serviceOrderRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate);
 
   app.get<{
-    Querystring: { status?: string; team?: string; technicianId?: string; page?: string; limit?: string };
+    Querystring: { status?: string; priority?: string; team?: string; technicianId?: string; page?: string; limit?: string };
   }>('/', controller.list.bind(controller));
 
   app.get<{ Params: { id: string } }>('/:id', controller.findById.bind(controller));
@@ -31,5 +31,11 @@ export default async function serviceOrderRoutes(app: FastifyInstance) {
     '/:id/execution',
     { onRequest: authorize('ADMIN', 'ATTENDANT', 'TECHNICIAN') },
     controller.updateExecution.bind(controller)
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/:id",
+    { onRequest: authorize("ADMIN", "ATTENDANT") },
+    controller.delete.bind(controller)
   );
 }

@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { Status } from '@prisma/client';
+import { Status, Priority } from '@prisma/client';
 import {
   ServiceOrderService,
   createOSSchema,
@@ -56,6 +56,7 @@ export class ServiceOrderController {
     request: FastifyRequest<{
       Querystring: {
         status?: string;
+        priority?: string;
         team?: string;
         technicianId?: string;
         page?: string;
@@ -64,14 +65,23 @@ export class ServiceOrderController {
     }>,
     reply: FastifyReply
   ) {
-    const { status, team, technicianId, page, limit } = request.query;
+    const { status, priority, team, technicianId, page, limit } = request.query;
     const result = await service.list({
       status: status as Status | undefined,
+      priority: priority as Priority | undefined,
       team,
       technicianId,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20,
     });
+    return reply.send(result);
+  }
+
+  async delete(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) {
+    const result = await service.delete(request.params.id);
     return reply.send(result);
   }
 

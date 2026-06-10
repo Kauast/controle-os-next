@@ -11,19 +11,19 @@ async function proxy(request: NextRequest, path: string[]) {
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const contentType = request.headers.get("content-type");
-  if (contentType && !contentType.includes("multipart/form-data")) {
-    headers["Content-Type"] = contentType;
-  }
 
   let body: BodyInit | undefined;
-  if (request.method !== "GET" && request.method !== "HEAD") {
+  if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "DELETE") {
     if (contentType?.includes("multipart/form-data")) {
       body = await request.blob();
       const boundary = contentType.split("boundary=")[1];
       if (boundary) headers["Content-Type"] = contentType;
     } else {
-      body = await request.text();
-      if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
+      const text = await request.text();
+      if (text) {
+        body = text;
+        headers["Content-Type"] = contentType ?? "application/json";
+      }
     }
   }
 
@@ -34,7 +34,7 @@ async function proxy(request: NextRequest, path: string[]) {
   });
 
   const data = await res.text();
-  return new NextResponse(data, {
+  return new NextResponse(data || null, {
     status: res.status,
     headers: { "Content-Type": res.headers.get("content-type") ?? "application/json" },
   });

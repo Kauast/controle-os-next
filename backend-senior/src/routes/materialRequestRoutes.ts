@@ -4,8 +4,8 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 
 const createSchema = z.object({
-  serviceOrderId: z.string().cuid(),
-  productId: z.string().cuid(),
+  serviceOrderId: z.string().min(1),
+  productId: z.string().min(1),
   quantity: z.number().int().positive(),
   requestedBy: z.string().optional(),
 });

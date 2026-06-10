@@ -2,18 +2,18 @@ import type { Role } from "./types";
 
 export interface AuthUser {
   id: string;
+  name?: string;
   email: string;
-  role: string; // backend role: ADMIN | STOCK | TECHNICIAN | ATTENDANT | FINANCIAL
+  role: string;
 }
 
-// Mapeia role do backend para role do frontend
 export function backendRoleToFrontend(backendRole: string): Role {
   const map: Record<string, Role> = {
-    ADMIN: "admin",
-    FINANCIAL: "admin",
-    STOCK: "estoque",
+    ADMIN:      "admin",
+    STOCK:      "estoque",
     TECHNICIAN: "tecnico",
-    ATTENDANT: "atendimento",
+    ATTENDANT:  "atendimento",
+    FINANCIAL:  "financeiro",
   };
   return map[backendRole] ?? "atendimento";
 }

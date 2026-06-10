@@ -273,7 +273,7 @@ export function ClientsPanel() {
                   {(client.chips?.length ?? 0) > 0 && (
                     <small className="flex items-center gap-1 text-[11px] text-teal">
                       <Cpu className="size-2.5" />
-                      {client.chips.length} chip{client.chips.length > 1 ? "s" : ""}
+                      {client.chips?.length ?? 0} chip{(client.chips?.length ?? 0) > 1 ? "s" : ""}
                     </small>
                   )}
                 </span>

@@ -13,17 +13,16 @@ import materialRequestRoutes from './routes/materialRequestRoutes';
 import chipRoutes from './routes/chipRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import userRoutes from './routes/userRoutes';
+import auditRoutes from './routes/auditRoutes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const isTest = process.env.NODE_ENV === 'test';
   const app = Fastify({ logger: !isTest });
 
-  // Error handler antes dos routes para garantir escopo correto no Fastify v5
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
-    // ZodError — duck-typing pelo name, pois instanceof pode falhar com múltiplas instâncias
     const asAny = error as any;
     if (asAny?.name === 'ZodError') {
-      return reply.status(400).send({ error: 'Dados inválidos', details: asAny.issues ?? asAny.errors });
+      return reply.status(400).send({ error: 'Dados invalidos', details: asAny.issues ?? asAny.errors });
     }
     if (!isTest) app.log.error(error);
     const statusCode = error.statusCode ?? 500;
@@ -56,6 +55,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(chipRoutes, { prefix: '/api/chips' });
   await app.register(uploadRoutes);
   await app.register(userRoutes, { prefix: '/api/users' });
+  await app.register(auditRoutes, { prefix: '/api/audit' });
 
   return app;
 }

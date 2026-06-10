@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useUIStore } from "@/store/use-ui-store";
 import { useProducts, useCreateProduct, useAdjustStock } from "@/hooks/useProducts";
+import { useMaterialRequests, useReviewMaterialRequest } from "@/hooks/useMaterialRequests";
 
 function stockStatus(p: Product) {
   if (p.qty <= p.min * 0.5) return { label: "Critico", pill: "red" as const };
@@ -115,8 +116,8 @@ function ProductFormSection({ role }: { role: Role }) {
 function MovementForms({ products }: { products: Product[] }) {
   const role = useAppStore((s) => s.role);
   const adjustStock = useAdjustStock();
-  const requests = useAppStore((s) => s.requests);
-  const reviewRequest = useAppStore((s) => s.reviewRequest);
+  const { data: requests = [] } = useMaterialRequests();
+  const reviewRequest = useReviewMaterialRequest();
   const [entry, setEntry] = useState({ id: "", qty: 1, reason: "" });
   const [exit, setExit] = useState({ id: "", qty: 1, reason: "venda" });
   const [msg, setMsg] = useState("");
@@ -227,24 +228,24 @@ function MovementForms({ products }: { products: Product[] }) {
             <span className="text-xs uppercase text-muted">Solicitacoes</span>
             <strong className="block text-sm text-ink">Pedidos de material das equipes</strong>
           </div>
-          <Badge tone="amber">{requests.filter((r) => r.status === "pendente").length} pendentes</Badge>
+          <Badge tone="amber">{requests.filter((r) => r.status === "PENDING").length} pendentes</Badge>
         </div>
         <div className="flex flex-col gap-2">
           {requests.length === 0 && <small className="text-muted">Nenhuma solicitacao pendente.</small>}
           {requests.map((r) => (
             <article key={r.id} className="rounded-[10px] border border-line bg-panel p-2.5">
               <strong className="text-sm text-ink">
-                {r.qty}x {r.name}
+                {r.quantity}x {r.product?.name ?? r.productId}
               </strong>
               <small className="block text-xs text-muted">
-                {r.os} · {r.status} · {r.when}
+                OS #{r.serviceOrder?.number ?? r.serviceOrderId} · {r.status} · {new Date(r.createdAt).toLocaleDateString("pt-BR")}
               </small>
-              {(role === "admin" || role === "estoque") && r.status === "pendente" && (
+              {(role === "admin" || role === "estoque") && r.status === "PENDING" && (
                 <div className="mt-2 flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => reviewRequest(r.id, "aprovado")}>
+                  <Button size="sm" variant="secondary" onClick={() => reviewRequest.mutate({ id: r.id, status: "APPROVED" })}>
                     Aprovar
                   </Button>
-                  <Button size="sm" variant="danger" onClick={() => reviewRequest(r.id, "reprovado")}>
+                  <Button size="sm" variant="danger" onClick={() => reviewRequest.mutate({ id: r.id, status: "REJECTED" })}>
                     Reprovar
                   </Button>
                 </div>

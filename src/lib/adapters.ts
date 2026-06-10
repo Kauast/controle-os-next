@@ -12,7 +12,7 @@ const STATUS_MAP: Record<string, ServiceOrder["status"]> = {
   IN_PROGRESS: "pending",
   WAITING_PARTS: "pending",
   COMPLETED: "completed",
-  CANCELLED: "completed",
+  CANCELLED: "cancelled",
 };
 
 export function adaptBackendOrder(os: BackendServiceOrder): ServiceOrder & { _backendId: string } {

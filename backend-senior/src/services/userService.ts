@@ -2,78 +2,74 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { audit } from '../lib/audit';
+
+const ROLES = ['ADMIN', 'SUPERVISOR', 'STOCK', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL'] as const;
 
 export const createUserSchema = z.object({
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
-  role: z
-    .enum(['ADMIN', 'STOCK', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL'])
-    .default('ATTENDANT'),
+  name: z.string().optional(),
+  email: z.string().email('E-mail invalido'),
+  password: z.string().min(8, 'Senha deve ter no minimo 8 caracteres'),
+  role: z.enum(ROLES).default('ATTENDANT'),
 });
 
 export const updateUserSchema = z
   .object({
-    role: z.enum(['ADMIN', 'STOCK', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL']).optional(),
+    name: z.string().optional(),
+    role: z.enum(ROLES).optional(),
     active: z.boolean().optional(),
   })
-  .refine((d) => d.role !== undefined || d.active !== undefined, {
+  .refine((d) => Object.values(d).some((v) => v !== undefined), {
     message: 'Informe ao menos um campo para atualizar',
   });
 
 export const resetPasswordSchema = z.object({
-  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
+  password: z.string().min(8, 'Senha deve ter no minimo 8 caracteres'),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
-const SELECT = {
-  id: true,
-  email: true,
-  role: true,
-  active: true,
-  createdAt: true,
-} as const;
+const SELECT = { id: true, name: true, email: true, role: true, active: true, createdAt: true } as const;
 
 export class UserService {
   async list() {
     return prisma.user.findMany({ select: SELECT, orderBy: { email: 'asc' } });
   }
 
-  async create(data: CreateUserInput) {
+  async create(data: CreateUserInput, requesterId?: string, requesterEmail?: string) {
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) throw new AppError('E-mail já cadastrado', 409);
-
+    if (existing) throw new AppError('E-mail ja cadastrado', 409);
     const hashed = await bcrypt.hash(data.password, 12);
-    return prisma.user.create({
-      data: { email: data.email, password: hashed, role: data.role },
+    const user = await prisma.user.create({
+      data: { name: data.name, email: data.email, password: hashed, role: data.role },
       select: SELECT,
     });
+    await audit({ userId: requesterId, userEmail: requesterEmail, action: 'USUARIO_CRIADO', detail: user.email + ' (' + data.role + ')' });
+    return user;
   }
 
-  async update(id: string, data: UpdateUserInput) {
+  async update(id: string, data: UpdateUserInput, requesterId?: string, requesterEmail?: string) {
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw new AppError('Usuário não encontrado', 404);
-
-    return prisma.user.update({ where: { id }, data, select: SELECT });
+    if (!user) throw new AppError('Usuario nao encontrado', 404);
+    const updated = await prisma.user.update({ where: { id }, data, select: SELECT });
+    await audit({ userId: requesterId, userEmail: requesterEmail, action: 'USUARIO_ATUALIZADO', detail: user.email + ' — ' + JSON.stringify(data) });
+    return updated;
   }
 
-  async resetPassword(id: string, newPassword: string) {
+  async resetPassword(id: string, newPassword: string, requesterId?: string, requesterEmail?: string) {
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw new AppError('Usuário não encontrado', 404);
-
+    if (!user) throw new AppError('Usuario nao encontrado', 404);
     const hashed = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({ where: { id }, data: { password: hashed } });
+    await audit({ userId: requesterId, userEmail: requesterEmail, action: 'SENHA_REDEFINIDA_ADMIN', detail: 'Senha de ' + user.email + ' redefinida pelo admin' });
   }
 
-  async remove(id: string, requesterId: string) {
-    if (id === requesterId) {
-      throw new AppError('Não é possível remover sua própria conta', 400);
-    }
+  async remove(id: string, requesterId: string, requesterEmail?: string) {
+    if (id === requesterId) throw new AppError('Nao e possivel remover sua propria conta', 400);
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) throw new AppError('Usuário não encontrado', 404);
-
-    // Soft delete para preservar integridade referencial
+    if (!user) throw new AppError('Usuario nao encontrado', 404);
     await prisma.user.update({ where: { id }, data: { active: false } });
+    await audit({ userId: requesterId, userEmail: requesterEmail, action: 'USUARIO_DESATIVADO', detail: user.email + ' desativado' });
   }
 }
