@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import type { Role } from '@prisma/client';
 import { buildApp } from '../src/app';
 
 // Prisma mockado para testes unitários — integração requer banco real
@@ -68,7 +69,7 @@ describe('POST /api/auth/register', () => {
     vi.mocked(prisma.user.create).mockResolvedValue({
       id: 'new-id',
       email: 'novo@test.com',
-      role: 'ATTENDANT' as any,
+      role: 'ATTENDANT' as Role,
       password: 'hashed',
       active: true,
       createdAt: new Date(),

@@ -14,7 +14,7 @@ export class AuthController {
   async login(request: FastifyRequest, reply: FastifyReply) {
     const data = loginSchema.parse(request.body);
     const user = await service.login(data, request.ip);
-    const token = (request.server as any).jwt.sign(
+    const token = await reply.jwtSign(
       { id: user.id, name: user.name, email: user.email, role: user.role },
       { expiresIn: '8h' }
     );

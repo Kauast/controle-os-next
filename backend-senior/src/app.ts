@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -20,9 +21,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: !isTest });
 
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
-    const asAny = error as any;
-    if (asAny?.name === 'ZodError') {
-      return reply.status(400).send({ error: 'Dados invalidos', details: asAny.issues ?? asAny.errors });
+    if (error instanceof ZodError) {
+      return reply.status(400).send({ error: 'Dados invalidos', details: error.issues });
     }
     if (!isTest) app.log.error(error);
     const statusCode = error.statusCode ?? 500;
