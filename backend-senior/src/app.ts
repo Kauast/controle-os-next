@@ -31,10 +31,19 @@ export async function buildApp(): Promise<FastifyInstance> {
     });
   });
 
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:3000').split(',');
+  const allowedOrigins = (
+    process.env.ALLOWED_ORIGINS ?? 'http://localhost:3000'
+  ).split(',').map((o) => o.trim());
+
+  // Capacitor APK usa esquema virtual https://app.guardiao (capacitor.config.ts: hostname)
+  const CAPACITOR_ORIGINS = ['https://app.guardiao', 'capacitor://app.guardiao'];
+
   await app.register(cors, {
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin) || CAPACITOR_ORIGINS.includes(origin)) {
+        return cb(null, true);
+      }
       cb(new Error('Not allowed by CORS'), false);
     },
     credentials: true,

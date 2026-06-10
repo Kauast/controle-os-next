@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const PUBLIC = ["/login", "/api/auth", "/tecnico/login"];
+// /tecnico-mobile é gerenciado pela própria página via localStorage (APK/Capacitor)
+const PUBLIC = ["/login", "/api/auth", "/tecnico/login", "/tecnico-mobile"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

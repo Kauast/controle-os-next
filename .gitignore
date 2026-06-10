@@ -59,3 +59,11 @@ docker-compose.override.yml
 backend-senior@1.0.0
 node
 tsx
+
+# Mobile build output (gerado por npm run build:mobile)
+out-mobile/
+
+# Arquivos temporários do build mobile
+next.config.ts.web
+middleware.ts.disabled
+src/app/_api_web/
