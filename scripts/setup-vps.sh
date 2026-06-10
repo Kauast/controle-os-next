@@ -89,9 +89,12 @@ step "6/7 — Reiniciando nginx com SSL"
 docker compose restart nginx
 info "Nginx recarregado"
 
-step "7/7 — Iniciando backup automático"
+step "7/7 — Iniciando backup e monitoramento"
 docker compose up -d backup
 info "Backup diário ativado → ./backups/"
+
+docker compose up -d prometheus node-exporter postgres-exporter redis-exporter grafana uptime-kuma
+info "Stack de monitoramento iniciada"
 
 # Cron para backup dos uploads (3h da manhã)
 CRON_JOB="0 3 * * * cd $(pwd) && tar -czf backups/uploads-\$(date +\\%Y\\%m\\%d).tar.gz uploads/ 2>&1 | logger -t controle-os-backup"
@@ -99,13 +102,14 @@ CRON_JOB="0 3 * * * cd $(pwd) && tar -czf backups/uploads-\$(date +\\%Y\\%m\\%d)
 info "Cron de backup de uploads configurado"
 
 echo ""
-echo -e "${GREEN}╔══════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Controle OS está no ar!                    ║${NC}"
-echo -e "${GREEN}║                                              ║${NC}"
-echo -e "${GREEN}║   URL: https://${DOMAIN}$(printf '%*s' $((32-${#DOMAIN})) '')║${NC}"
-echo -e "${GREEN}║                                              ║${NC}"
-echo -e "${GREEN}║   Logs:    docker compose logs -f            ║${NC}"
-echo -e "${GREEN}║   Status:  docker compose ps                 ║${NC}"
-echo -e "${GREEN}║   Backup:  ./scripts/backup-now.sh           ║${NC}"
-echo -e "${GREEN}║   Restore: ./scripts/restore.sh              ║${NC}"
-echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
+echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║   Controle OS está no ar!                            ║${NC}"
+echo -e "${GREEN}║                                                      ║${NC}"
+echo -e "${GREEN}║   App:         https://${DOMAIN}$(printf '%*s' $((26-${#DOMAIN})) '')║${NC}"
+echo -e "${GREEN}║   Uptime Kuma: https://${DOMAIN}:3001$(printf '%*s' $((20-${#DOMAIN})) '')║${NC}"
+echo -e "${GREEN}║   Grafana:     https://${DOMAIN}:3200$(printf '%*s' $((20-${#DOMAIN})) '')║${NC}"
+echo -e "${GREEN}║                                                      ║${NC}"
+echo -e "${GREEN}║   Logs:    docker compose logs -f                    ║${NC}"
+echo -e "${GREEN}║   Status:  docker compose ps                         ║${NC}"
+echo -e "${GREEN}║   Backup:  ./scripts/backup-now.sh                   ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
