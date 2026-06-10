@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LionShield } from "@/components/layout/LionShield";
 
 const schema = z.object({
   email: z.string().email("E-mail inválido"),
@@ -88,12 +88,14 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="grid min-h-screen place-items-center bg-panel px-4">
-      <div className="w-full max-w-sm rounded-[20px] border border-line bg-panel-soft p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-lg border border-line bg-panel-soft p-8 shadow-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Image src="/logo.svg" alt="Logo" width={56} height={56} className="rounded-[14px]" />
+          <div className="size-16 rounded-md bg-onyx grid place-items-center">
+            <LionShield className="size-10 text-silver" />
+          </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-ink">Controle OS</h1>
-            <p className="text-sm text-muted">Faça login para continuar</p>
+            <h1 className="text-[11px] font-semibold tracking-[0.28em] text-ink uppercase">GUARDIÃO</h1>
+            <p className="font-mono-tabular text-[9px] uppercase tracking-[0.22em] text-muted mt-0.5">Service Ops</p>
           </div>
         </div>
         <Suspense fallback={<div className="h-32 animate-pulse rounded-[12px] bg-panel-soft" />}>
