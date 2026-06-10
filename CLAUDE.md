@@ -103,7 +103,7 @@ All routes are registered in `backend-senior/src/server.ts` under `/api/*`:
 | `/api/technicians` | `technicianRoutes.ts` |
 | `/api/reports` | `reportRoutes.ts` |
 
-All routes except `/api/auth/login` and `/api/auth/register` require the `authenticate` middleware (JWT). Admin-only routes additionally call `authorize('ADMIN')`.
+All routes except `/api/auth/login` require the `authenticate` middleware (JWT). `POST /api/auth/register` requires `ADMIN` role (`authenticate + authorize('ADMIN')`). Admin-only routes additionally call `authorize('ADMIN')`.
 
 ### Prisma schema notes
 
