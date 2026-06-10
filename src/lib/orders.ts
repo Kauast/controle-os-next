@@ -42,8 +42,8 @@ export function orderCalendarDate(o: ServiceOrder) {
 }
 
 export const toneBorder: Record<string, string> = {
-  high: "border-l-4 border-l-red",
-  warning: "border-l-4 border-l-amber",
-  completed: "border-l-4 border-l-teal",
-  normal: "border-l-4 border-l-line",
+  high: "border-l-[3px] border-l-status-critical",
+  warning: "border-l-[3px] border-l-status-waiting",
+  completed: "border-l-[3px] border-l-status-done",
+  normal: "border-l-[3px] border-l-status-open",
 };

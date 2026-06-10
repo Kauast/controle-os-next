@@ -1,12 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-instrument-sans",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-jetbrains-mono",
+});
 
 export const metadata: Metadata = {
-  title: "Controle OS, Estoque e Agenda",
+  title: "Guardião · Service Ops",
   description:
     "Sistema de ordens de servico, estoque com QR Code, agenda por equipes e app do tecnico.",
 };
@@ -22,7 +32,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.variable} overflow-x-hidden antialiased`}>
+      <body
+        className={`${instrumentSans.variable} ${jetbrainsMono.variable} overflow-x-hidden antialiased`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

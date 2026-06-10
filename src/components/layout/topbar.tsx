@@ -42,8 +42,9 @@ export function Topbar() {
   }
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-panel/70 px-4 py-3 backdrop-blur lg:px-7 lg:py-4">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <header className="h-14 flex items-center justify-between gap-3 border-b border-border bg-background/80 backdrop-blur px-4 lg:px-8 sticky top-0 z-20">
+      {/* Left — breadcrumb + mobile menu */}
+      <div className="flex min-w-0 items-center gap-3">
         <Button
           variant="icon"
           size="icon"
@@ -53,19 +54,22 @@ export function Topbar() {
         >
           <Menu className="size-5" />
         </Button>
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted sm:text-xs">{copy.context}</p>
-          <h1 className="truncate text-base font-bold text-ink sm:text-xl">{copy.title}</h1>
-        </div>
+        <nav className="hidden sm:flex items-center gap-2 text-sm min-w-0">
+          <span className="text-muted-foreground truncate">{copy.context}</span>
+          <span className="text-border">/</span>
+          <span className="font-medium text-foreground truncate">{copy.title}</span>
+        </nav>
+        {/* mobile: just title */}
+        <span className="sm:hidden text-sm font-semibold text-foreground truncate">{copy.title}</span>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Seletor de perfil visível apenas em desenvolvimento */}
+      {/* Right — controls */}
+      <div className="flex items-center gap-2 shrink-0">
         {isDev && (
           <Label className="hidden text-[10px] sm:block">
             Perfil (dev)
             <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-              <SelectTrigger className="h-9 w-[130px]">
+              <SelectTrigger className="h-8 w-[130px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -83,7 +87,7 @@ export function Topbar() {
           <Label className="text-[10px]">
             Equipe
             <Select value={activeTeam} onValueChange={setActiveTeam}>
-              <SelectTrigger className="h-9 w-[110px] sm:w-[130px]">
+              <SelectTrigger className="h-8 w-[110px] sm:w-[130px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -98,27 +102,31 @@ export function Topbar() {
         )}
 
         <Button variant="icon" size="icon" aria-label="Pesquisar">
-          <Search />
+          <Search className="size-4" />
         </Button>
 
-        {/* Botões secundários — visíveis só em telas maiores */}
-        <Button variant="secondary" className="hidden sm:inline-flex">
-          <Download /> Exportar
+        <Button variant="secondary" className="hidden sm:inline-flex h-8 text-xs">
+          <Download className="size-3.5" /> Exportar
         </Button>
-        <Button variant="secondary" className="hidden sm:inline-flex" onClick={() => setTeamLoginOpen(true)}>
-          <LogIn /> Conta equipe
+        <Button
+          variant="secondary"
+          className="hidden sm:inline-flex h-8 text-xs"
+          onClick={() => setTeamLoginOpen(true)}
+        >
+          <LogIn className="size-3.5" /> Conta equipe
         </Button>
 
-        {/* Nova OS — visível em mobile também */}
         {role !== "estoque" && role !== "tecnico" && (
-          <Button onClick={() => setNewOsOpen(true)}>
-            <Plus />
+          <Button
+            onClick={() => setNewOsOpen(true)}
+            className="h-8 text-xs font-semibold bg-amber text-onyx hover:bg-amber/90"
+          >
+            <Plus className="size-3.5" />
             <span className="hidden sm:inline">Nova OS</span>
           </Button>
         )}
 
-        {/* E-mail do usuário — oculto em mobile */}
-        <span className="hidden rounded-full bg-panel-soft px-3 py-1.5 text-xs font-semibold text-muted sm:block">
+        <span className="hidden rounded-sm bg-muted/60 border border-border px-3 py-1.5 text-[11px] font-medium text-muted-foreground sm:block">
           {user?.email ?? ROLE_LABELS[role]}
         </span>
 
