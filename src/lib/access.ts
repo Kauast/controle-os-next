@@ -6,6 +6,7 @@ export type SectionKey =
   | "ordens"
   | "estoque"
   | "clientes"
+  | "diretorio"
   | "equipe"
   | "usuarios"
   | "rastreamento"
@@ -17,6 +18,7 @@ export const access = {
   stockWrite: (r: Role) => r === "admin" || r === "estoque",
   tracking: (r: Role) => r === "admin" || r === "atendimento",
   clients: (r: Role) => r === "admin" || r === "atendimento",
+  clientsDirectory: (r: Role) => r === "admin" || r === "atendimento" || r === "tecnico",
   reports: (r: Role) => r === "admin" || r === "atendimento",
   teams: (r: Role) => r === "admin" || r === "atendimento",
   finance: (r: Role) => r === "admin",
@@ -34,6 +36,8 @@ export function canAccessSection(section: SectionKey, role: Role): boolean {
       return access.stock(role);
     case "clientes":
       return access.clients(role);
+    case "diretorio":
+      return access.clientsDirectory(role);
     case "equipe":
       return access.teams(role);
     case "usuarios":

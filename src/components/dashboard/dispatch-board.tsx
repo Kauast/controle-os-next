@@ -258,10 +258,10 @@ export function DispatchBoard() {
     <div className="rounded-lg border border-border bg-card p-5 shadow-[var(--shadow-panel)]">
       <SectionHeading eyebrow="Agenda das equipes" title="OS do dia e despacho" />
 
-      <div className="overflow-x-auto pb-2">
-        <div className="flex gap-3 min-w-max">
-          {/* Available OS column */}
-          {!technicianView && (
+      <div className="flex gap-3">
+        {/* Available OS column — fixed, does not scroll */}
+        {!technicianView && (
+          <div className="shrink-0 w-[220px]">
             <KanbanColumn
               title="Disponíveis"
               subtitle="Arraste para uma equipe"
@@ -274,27 +274,31 @@ export function DispatchBoard() {
               onDragStart={startDrag}
               dragCode={dragCode}
             />
-          )}
+          </div>
+        )}
 
-          {/* Team columns */}
-          {visibleTeams.map((team) => {
-            const teamOrders = sortOrders(orders.filter((o) => o.team === team));
-            return (
-              <KanbanColumn
-                key={team}
-                title={team}
-                subtitle={teamMembers(team)}
-                orders={teamOrders}
-                isOver={overTeam === team}
-                isEmpty
-                onDragOver={(e) => { e.preventDefault(); setOverTeam(team); }}
-                onDragLeave={() => setOverTeam((t) => (t === team ? null : t))}
-                onDrop={() => drop(team)}
-                onDragStart={startDrag}
-                dragCode={dragCode}
-              />
-            );
-          })}
+        {/* Team columns — scroll horizontally */}
+        <div className="flex-1 overflow-x-auto pb-2">
+          <div className="flex gap-3 min-w-max">
+            {visibleTeams.map((team) => {
+              const teamOrders = sortOrders(orders.filter((o) => o.team === team));
+              return (
+                <KanbanColumn
+                  key={team}
+                  title={team}
+                  subtitle={teamMembers(team)}
+                  orders={teamOrders}
+                  isOver={overTeam === team}
+                  isEmpty
+                  onDragOver={(e) => { e.preventDefault(); setOverTeam(team); }}
+                  onDragLeave={() => setOverTeam((t) => (t === team ? null : t))}
+                  onDrop={() => drop(team)}
+                  onDragStart={startDrag}
+                  dragCode={dragCode}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

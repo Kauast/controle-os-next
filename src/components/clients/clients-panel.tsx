@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Save, Trash2, Search, UserCheck, UserX, Upload, Cpu, Wifi, WifiOff, Wrench } from "lucide-react";
+import { Plus, Save, Search, UserCheck, UserX, Upload, Cpu, Wifi, WifiOff, Wrench } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, SectionHeading } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/ui/delete-button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -657,9 +658,7 @@ function ClientDetail({
         <Button className="flex-1" size="sm" onClick={onEdit}>
           <Save /> Editar
         </Button>
-        <Button variant="danger" size="sm" disabled={isDeleting} onClick={onDelete}>
-          <Trash2 /> Excluir
-        </Button>
+        <DeleteButton size="sm" disabled={isDeleting} onConfirm={onDelete} />
       </div>
     </div>
   );
@@ -696,13 +695,7 @@ function ChipCard({ chip, onDelete }: { chip: Chip; onDelete: () => void }) {
             <StatusIcon className="size-2.5" />
             {CHIP_STATUS_LABEL[chip.status] ?? chip.status}
           </Badge>
-          <button
-            onClick={onDelete}
-            className="rounded p-0.5 text-muted hover:text-red transition-colors"
-            title="Remover chip"
-          >
-            <Trash2 className="size-3" />
-          </button>
+          <DeleteButton compact onConfirm={onDelete} />
         </div>
       </div>
 

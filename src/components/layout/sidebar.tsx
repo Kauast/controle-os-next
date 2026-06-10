@@ -37,6 +37,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
       { key: "ordens", label: "Ordens", icon: ClipboardList },
       { key: "equipe", label: "Equipes", icon: UserCog },
       { key: "rastreamento", label: "Localizacao", icon: MapPin },
+      { key: "diretorio", label: "Clientes", icon: Users },
     ],
   },
   {

@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../lib/errors';
 
 export const registerSchema = z.object({
   email: z.string().email(),
@@ -19,7 +20,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export class AuthService {
   async register(data: RegisterInput) {
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) throw new Error('E-mail já cadastrado');
+    if (existing) throw new AppError('E-mail já cadastrado', 409);
 
     const hashed = await bcrypt.hash(data.password, 12);
     const user = await prisma.user.create({
@@ -31,10 +32,10 @@ export class AuthService {
 
   async login(data: LoginInput) {
     const user = await prisma.user.findUnique({ where: { email: data.email } });
-    if (!user || !user.active) throw new Error('Credenciais inválidas');
+    if (!user || !user.active) throw new AppError('Credenciais inválidas', 401);
 
     const valid = await bcrypt.compare(data.password, user.password);
-    if (!valid) throw new Error('Credenciais inválidas');
+    if (!valid) throw new AppError('Credenciais inválidas', 401);
 
     return { id: user.id, email: user.email, role: user.role };
   }

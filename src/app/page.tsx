@@ -17,6 +17,7 @@ import { TrackingPanel } from "@/components/tracking/tracking-panel";
 import { TeamsPanel } from "@/components/teams/teams-panel";
 import { ProfilesPanel } from "@/components/teams/profiles-panel";
 import { ClientsPanel } from "@/components/clients/clients-panel";
+import { ClientsDirectoryPanel } from "@/components/clients/clients-directory";
 import { NewOsDialog } from "@/components/dialogs/new-os-dialog";
 import { ScheduleDialog } from "@/components/dialogs/schedule-dialog";
 import { TeamLoginDialog } from "@/components/dialogs/team-login-dialog";
@@ -48,6 +49,8 @@ function SectionView({ section }: { section: SectionKey }) {
       return <StockPanel />;
     case "clientes":
       return <ClientsPanel />;
+    case "diretorio":
+      return <ClientsDirectoryPanel />;
     case "equipe":
       return <TeamsPanel />;
     case "usuarios":
