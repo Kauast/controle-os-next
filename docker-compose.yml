@@ -1,53 +1,66 @@
 version: "3.8"
 
 services:
+  # ── Banco de dados ──────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-controle_os}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - app
 
+  # ── Cache / filas ───────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - app
 
+  # ── Backend (Fastify) ───────────────────────────────────────────
   backend:
     build:
       context: ./backend-senior
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-controle_os}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3333
       NODE_ENV: production
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      ALLOWED_ORIGINS: https://${DOMAIN}
+      UPLOAD_DIR: /app/uploads
+      UPLOAD_BASE_URL: https://${DOMAIN}/uploads
       SEED_ADMIN_PASS: ${SEED_ADMIN_PASS}
       SEED_STOCK_PASS: ${SEED_STOCK_PASS}
       SEED_TECH_PASS: ${SEED_TECH_PASS}
       SEED_ATTENDANT_PASS: ${SEED_ATTENDANT_PASS}
       SEED_FINANCIAL_PASS: ${SEED_FINANCIAL_PASS}
-    ports:
-      - "3333:3333"
+    volumes:
+      - ./uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,20 +68,101 @@ services:
         condition: service_healthy
     command: >
       sh -c "npx prisma migrate deploy && npm run seed && npm run start"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - app
 
+  # ── Frontend (Next.js) ──────────────────────────────────────────
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       BACKEND_URL: http://backend:3333
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
-    ports:
-      - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - app
+
+  # ── Nginx (reverse proxy + SSL) ─────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/entrypoint.sh:/entrypoint.sh:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/letsencrypt:/etc/letsencrypt:ro
+      - ./uploads:/app/uploads:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    depends_on:
+      - frontend
+    networks:
+      - app
+
+  # ── Certbot (renovação automática SSL) ─────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/letsencrypt:/etc/letsencrypt
+    entrypoint: >
+      /bin/sh -c "
+        trap exit TERM;
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet 2>&1;
+          sleep 12h & wait $${!};
+        done
+      "
+
+  # ── Backup automático do PostgreSQL ────────────────────────────
+  backup:
+    image: prodrigestivill/postgres-backup-local:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-controle_os}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 3
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  app:
+    driver: bridge

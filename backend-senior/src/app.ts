@@ -11,6 +11,7 @@ import authRoutes from './routes/authRoutes';
 import reportRoutes from './routes/reportRoutes';
 import materialRequestRoutes from './routes/materialRequestRoutes';
 import chipRoutes from './routes/chipRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const isTest = process.env.NODE_ENV === 'test';
@@ -52,6 +53,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(reportRoutes, { prefix: '/api/reports' });
   await app.register(materialRequestRoutes, { prefix: '/api/material-requests' });
   await app.register(chipRoutes, { prefix: '/api/chips' });
+  await app.register(uploadRoutes);
 
   return app;
 }

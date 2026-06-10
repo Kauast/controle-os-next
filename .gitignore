@@ -44,3 +44,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+backups/*.sql.gz
+backups/*.tar.gz
+uploads/
+certbot/letsencrypt/
