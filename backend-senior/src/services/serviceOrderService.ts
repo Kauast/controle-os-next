@@ -67,13 +67,25 @@ export class ServiceOrderService {
     });
   }
 
-  async updateStatus(id: string, newStatus: Status, cancellationReason?: string) {
+  async updateStatus(
+    id: string,
+    newStatus: Status,
+    cancellationReason?: string,
+    requester?: { id: string; role: string }
+  ) {
     return prisma.$transaction(async (tx) => {
       const os = await tx.serviceOrder.findUnique({
         where: { id },
         include: { payments: true },
       });
       if (!os) throw new Error('OS não encontrada');
+
+      if (requester?.role === 'TECHNICIAN') {
+        const technician = await tx.technician.findUnique({ where: { userId: requester.id } });
+        if (!technician || os.technicianId !== technician.id) {
+          throw new Error('Técnico não autorizado para esta OS');
+        }
+      }
 
       if (!canTransition(os.status, newStatus)) {
         throw new Error(`Transição inválida: ${os.status} → ${newStatus}`);

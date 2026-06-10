@@ -25,7 +25,8 @@ export class ServiceOrderController {
   ) {
     const { id } = request.params;
     const { status, cancellationReason } = request.body;
-    const result = await service.updateStatus(id, status as Status, cancellationReason);
+    const requester = request.user as { id: string; role: string };
+    const result = await service.updateStatus(id, status as Status, cancellationReason, requester);
     return reply.send(result);
   }
 

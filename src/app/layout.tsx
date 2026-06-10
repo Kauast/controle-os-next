@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   title: "Guardião · Service Ops",
   description:
     "Gestão visual de ordens de serviço, despacho por equipes e controle de estoque.",
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {

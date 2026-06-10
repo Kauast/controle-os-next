@@ -12,7 +12,8 @@
     "studio": "prisma studio",
     "seed": "tsx src/lib/seed-users.ts",
     "test": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "seed": "tsx src/lib/seed-users.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,18 @@
+{
+  "name": "Controle OS",
+  "short_name": "ControleOS",
+  "description": "Sistema de ordens de servico, estoque e agenda",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#127d75",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
