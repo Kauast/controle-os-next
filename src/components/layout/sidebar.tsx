@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn, userInitials } from "@/lib/utils";
 import { canAccessSection, type SectionKey } from "@/lib/access";
 import { useAppStore } from "@/store/use-app-store";
 import { useAuthStore } from "@/store/use-auth-store";
@@ -59,20 +59,11 @@ const groups: { label?: string; items: NavItem[] }[] = [
   },
 ];
 
-function getInitials(email: string | undefined, role: string): string {
-  if (email) {
-    const parts = email.split("@")[0].split(/[._-]/);
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return email.slice(0, 2).toUpperCase();
-  }
-  return role.slice(0, 2).toUpperCase();
-}
-
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const role = useAppStore((s) => s.role);
   const { section, stockTarget, setSection } = useUIStore();
   const user = useAuthStore((s) => s.user);
-  const initials = getInitials(user?.email, role);
+  const initials = userInitials(user?.email, role.slice(0, 2).toUpperCase());
 
   return (
     <>

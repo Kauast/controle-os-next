@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, Clock, GripVertical, Plus } from "lucide-react";
 import { SectionHeading } from "@/components/ui/card";
 import { access } from "@/lib/access";
 import { orderTone, sortOrders, toneBorder } from "@/lib/orders";
 import { TEAMS } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, userInitials } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
 import { useTechnicians } from "@/hooks/useTechnicians";
@@ -115,7 +115,7 @@ function OSCard({
       <footer className="mt-3 pt-3 border-t border-dashed border-border flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <div className="size-6 rounded-full bg-onyx text-silver grid place-items-center text-[9px] font-mono-tabular shrink-0">
-            {techInitials(order.tech)}
+            {userInitials(order.tech)}
           </div>
           <span className="text-[11px] text-foreground/70 truncate">
             {order.tech || "Não atribuído"}
@@ -155,7 +155,7 @@ function KanbanColumn({
   showAddButton?: boolean;
   onAdd?: () => void;
 }) {
-  const criticals = orders.filter((o) => o.priority === "high").length;
+  const criticals = useMemo(() => orders.filter((o) => o.priority === "high").length, [orders]);
 
   return (
     <div className="flex flex-col min-w-[260px]">
