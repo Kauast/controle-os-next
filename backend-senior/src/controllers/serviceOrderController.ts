@@ -11,7 +11,8 @@ const service = new ServiceOrderService();
 export class ServiceOrderController {
   async create(request: FastifyRequest, reply: FastifyReply) {
     const data = createOSSchema.parse(request.body);
-    const result = await service.create(data);
+    const user = request.user as { id: string };
+    const result = await service.create(data, user.id);
     return reply.status(201).send(result);
   }
 

@@ -17,4 +17,15 @@ export default async function reportRoutes(app: FastifyInstance) {
     { onRequest: authorize('ADMIN', 'FINANCIAL') },
     controller.financeSummary.bind(controller)
   );
+  app.get('/locations', controller.teamLocations.bind(controller));
+  app.get(
+    '/attendants',
+    { onRequest: authorize('ADMIN', 'FINANCIAL') },
+    controller.attendantReport.bind(controller)
+  );
+  app.get(
+    '/users',
+    { onRequest: authorize('ADMIN') },
+    controller.listUsers.bind(controller)
+  );
 }

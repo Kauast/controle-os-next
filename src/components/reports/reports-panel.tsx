@@ -13,14 +13,13 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TEAMS } from "@/lib/types";
-import { useTeamReport } from "@/hooks/queries";
-
-const instructors: { name: string; instructed: number; redirected: number; pending: number; last: string }[] = [];
+import { useTeamReport, useAttendantReport } from "@/hooks/queries";
 
 export function ReportsPanel() {
   const [filter, setFilter] = useState("all");
-  const { data, isLoading } = useTeamReport(filter);
-  const total = data?.reduce((s, r) => s + r.completed, 0) ?? 0;
+  const { data: teamData, isLoading: loadingTeam } = useTeamReport(filter);
+  const { data: attendants = [], isLoading: loadingAttendants } = useAttendantReport();
+  const total = teamData?.reduce((s, r) => s + r.completed, 0) ?? 0;
 
   return (
     <Card>
@@ -57,7 +56,7 @@ export function ReportsPanel() {
               <Badge tone="teal">{total} concluidas</Badge>
             </div>
           </div>
-          {isLoading ? (
+          {loadingTeam ? (
             <p className="py-6 text-center text-sm text-muted">Carregando relatorio...</p>
           ) : (
             <Table>
@@ -72,7 +71,7 @@ export function ReportsPanel() {
                 </TR>
               </THead>
               <TBody>
-                {data?.map((r) => (
+                {teamData?.map((r) => (
                   <TR key={r.team}>
                     <TD>{r.team}</TD>
                     <TD>{r.completed}</TD>
@@ -94,28 +93,32 @@ export function ReportsPanel() {
             <span className="text-xs uppercase text-muted">Quem instrui as OS</span>
             <strong className="block text-sm text-ink">Distribuicao e pendencias</strong>
           </div>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Responsavel</TH>
-                <TH>Instruidas</TH>
-                <TH>Redir.</TH>
-                <TH>Pend.</TH>
-                <TH>Ultima acao</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {instructors.map((i) => (
-                <TR key={i.name}>
-                  <TD>{i.name}</TD>
-                  <TD>{i.instructed}</TD>
-                  <TD>{i.redirected}</TD>
-                  <TD>{i.pending}</TD>
-                  <TD className="text-xs text-muted">{i.last}</TD>
+          {loadingAttendants ? (
+            <p className="py-6 text-center text-sm text-muted">Carregando...</p>
+          ) : (
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Responsavel</TH>
+                  <TH>Instruidas</TH>
+                  <TH>Redir.</TH>
+                  <TH>Pend.</TH>
+                  <TH>Ultima acao</TH>
                 </TR>
-              ))}
-            </TBody>
-          </Table>
+              </THead>
+              <TBody>
+                {attendants.map((i) => (
+                  <TR key={i.email}>
+                    <TD>{i.name}</TD>
+                    <TD>{i.instructed}</TD>
+                    <TD>{i.redirected}</TD>
+                    <TD>{i.pending}</TD>
+                    <TD className="text-xs text-muted">{i.last}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          )}
         </section>
       </div>
     </Card>

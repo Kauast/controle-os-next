@@ -1,21 +1,28 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { fetchFinance, fetchTeamReport } from "@/lib/api";
-import { useAppStore } from "@/store/use-app-store";
+import { fetchFinance, fetchTeamReport, fetchAttendantReport } from "@/lib/api";
 
 export function useTeamReport(filterTeam: string) {
-  const ordersVersion = useAppStore((s) => s.orders.length);
   return useQuery({
-    queryKey: ["team-report", filterTeam, ordersVersion],
+    queryKey: ["team-report", filterTeam],
     queryFn: () => fetchTeamReport(filterTeam),
+    staleTime: 30_000,
   });
 }
 
 export function useFinance() {
-  const productsVersion = useAppStore((s) => s.products.length);
   return useQuery({
-    queryKey: ["finance", productsVersion],
+    queryKey: ["finance"],
     queryFn: fetchFinance,
+    staleTime: 30_000,
+  });
+}
+
+export function useAttendantReport() {
+  return useQuery({
+    queryKey: ["attendant-report"],
+    queryFn: fetchAttendantReport,
+    staleTime: 30_000,
   });
 }

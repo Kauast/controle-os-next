@@ -54,3 +54,22 @@ export async function fetchFinance(): Promise<FinanceSummary> {
     };
   }
 }
+
+export interface AttendantRow {
+  name: string;
+  email: string;
+  role: string;
+  instructed: number;
+  redirected: number;
+  pending: number;
+  last: string;
+}
+
+export async function fetchAttendantReport(): Promise<AttendantRow[]> {
+  try {
+    const { data } = await apiClient.get<AttendantRow[]>("/reports/attendants");
+    return data;
+  } catch {
+    return [];
+  }
+}

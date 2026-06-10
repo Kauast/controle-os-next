@@ -60,37 +60,37 @@ function OSCard({
     <article
       draggable
       className={cn(
-        "group bg-card rounded-md border border-border border-l-[3px]",
+        "group bg-card rounded-sm border border-border border-l-[3px]",
         toneBorder[tone],
-        "p-3.5 cursor-grab active:cursor-grabbing transition-shadow",
+        "p-2.5 cursor-grab active:cursor-grabbing transition-shadow",
         isDragging ? "opacity-40" : "hover:shadow-sm hover:border-foreground/10",
       )}
     >
-      <header className="flex items-start justify-between gap-2 mb-2">
+      <header className="flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono-tabular text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <span className="font-mono-tabular text-[10px] text-muted-foreground">
               {order.code}
             </span>
-            <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/50">
               · {statusLabel[order.status] ?? order.status}
             </span>
           </div>
-          <h3 className="text-[13.5px] font-semibold leading-snug text-foreground mt-0.5 truncate">
+          <h3 className="text-[12.5px] font-semibold leading-snug text-foreground truncate">
             {order.client}
           </h3>
         </div>
-        <GripVertical className="size-3.5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        <GripVertical className="size-3 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
       </header>
 
-      <p className="text-[12px] text-muted-foreground leading-snug mb-3 line-clamp-2">
+      <p className="text-[11px] text-muted-foreground leading-snug mb-2 line-clamp-1">
         {order.description}
       </p>
 
       <div className="flex items-center justify-between gap-2">
         <span
           className={cn(
-            "inline-flex items-center px-1.5 py-0.5 rounded-sm border text-[9px] font-semibold uppercase tracking-widest",
+            "inline-flex items-center px-1 py-px rounded-sm border text-[9px] font-semibold uppercase tracking-widest",
             prio.className,
           )}
         >
@@ -99,28 +99,26 @@ function OSCard({
 
         <div
           className={cn(
-            "flex items-center gap-1 text-[10.5px] font-mono-tabular",
+            "flex items-center gap-1 text-[10px] font-mono-tabular",
             late ? "text-status-critical" : "text-muted-foreground",
           )}
         >
           {late ? (
-            <AlertTriangle className="size-3" strokeWidth={2} />
+            <AlertTriangle className="size-2.5" strokeWidth={2} />
           ) : (
-            <Clock className="size-3" strokeWidth={1.75} />
+            <Clock className="size-2.5" strokeWidth={1.75} />
           )}
           <span>{order.time || "—"}</span>
         </div>
       </div>
 
-      <footer className="mt-3 pt-3 border-t border-dashed border-border flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="size-6 rounded-full bg-onyx text-silver grid place-items-center text-[9px] font-mono-tabular shrink-0">
-            {userInitials(order.tech)}
-          </div>
-          <span className="text-[11px] text-foreground/70 truncate">
-            {order.tech || "Não atribuído"}
-          </span>
+      <footer className="mt-2 pt-2 border-t border-dashed border-border flex items-center gap-1.5">
+        <div className="size-5 rounded-full bg-onyx text-silver grid place-items-center text-[8px] font-mono-tabular shrink-0">
+          {userInitials(order.tech)}
         </div>
+        <span className="text-[10px] text-foreground/60 truncate">
+          {order.tech || "Não atribuído"}
+        </span>
       </footer>
     </article>
   );
@@ -158,20 +156,20 @@ function KanbanColumn({
   const criticals = useMemo(() => orders.filter((o) => o.priority === "high").length, [orders]);
 
   return (
-    <div className="flex flex-col min-w-[260px]">
+    <div className="flex flex-col min-w-[220px]">
       {/* Column header */}
-      <header className="px-1 mb-3">
+      <header className="px-1 mb-2">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-foreground">
+          <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-foreground">
             {title}
           </h2>
-          <span className="font-mono-tabular text-[11px] text-muted-foreground">
+          <span className="font-mono-tabular text-[10px] text-muted-foreground">
             {String(orders.length).padStart(2, "0")}
           </span>
         </div>
-        <div className="flex items-center justify-between mt-1">
+        <div className="flex items-center justify-between mt-0.5">
           {subtitle && (
-            <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>
+            <span className="text-[10px] text-muted-foreground truncate">{subtitle}</span>
           )}
           {criticals > 0 && (
             <span className="text-[9px] font-semibold uppercase tracking-widest text-status-critical ml-auto">
@@ -187,7 +185,7 @@ function KanbanColumn({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "flex-1 rounded-md p-2 space-y-2 transition-colors min-h-[160px]",
+          "flex-1 rounded-md p-1.5 space-y-1.5 transition-colors min-h-[120px]",
           isOver
             ? "bg-amber-soft ring-1 ring-amber/40 ring-inset"
             : "bg-muted/40",
@@ -206,7 +204,7 @@ function KanbanColumn({
         ))}
 
         {orders.length === 0 && (
-          <div className="h-24 grid place-items-center text-[11px] text-muted-foreground/50 uppercase tracking-widest border border-dashed border-border rounded-sm">
+          <div className="h-16 grid place-items-center text-[10px] text-muted-foreground/50 uppercase tracking-widest border border-dashed border-border rounded-sm">
             {isEmpty ? "Arraste uma OS aqui" : "Sem OS"}
           </div>
         )}
@@ -214,9 +212,9 @@ function KanbanColumn({
         {showAddButton && (
           <button
             onClick={onAdd}
-            className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-card rounded-sm transition-colors border border-dashed border-transparent hover:border-border"
+            className="w-full mt-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-card rounded-sm transition-colors border border-dashed border-transparent hover:border-border"
           >
-            <Plus className="size-3" />
+            <Plus className="size-2.5" />
             Adicionar OS
           </button>
         )}
@@ -261,7 +259,7 @@ export function DispatchBoard() {
       <SectionHeading eyebrow="Agenda das equipes" title="OS do dia e despacho" />
 
       <div className="overflow-x-auto pb-2">
-        <div className="flex gap-4 min-w-max">
+        <div className="flex gap-3 min-w-max">
           {/* Available OS column */}
           {!technicianView && (
             <KanbanColumn

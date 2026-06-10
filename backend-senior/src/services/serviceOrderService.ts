@@ -13,7 +13,7 @@ import { prisma } from '../lib/prisma';
 export { createOSSchema, updateExecutionSchema, canTransition, type CreateOSInput };
 
 export class ServiceOrderService {
-  async create(data: CreateOSInput) {
+  async create(data: CreateOSInput, createdById?: string) {
     return prisma.$transaction(async (tx) => {
       const client = await tx.client.findUnique({ where: { id: data.clientId } });
       if (!client) throw new Error('Cliente não encontrado');
@@ -59,6 +59,7 @@ export class ServiceOrderService {
           team: data.team ?? 'Sem equipe',
           priority: (data.priority as Priority) ?? 'NORMAL',
           scheduledTime: data.scheduledTime,
+          createdById: createdById ?? null,
           items: data.items.length > 0 ? { create: data.items } : undefined,
         },
         include: { client: true, technician: true, items: true },

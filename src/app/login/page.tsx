@@ -2,20 +2,30 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { SignInPage, type Testimonial } from "@/components/ui/sign-in";
 import { LionShield } from "@/components/layout/LionShield";
 
-const schema = z.object({
-  email: z.string().email("E-mail inválido"),
-  password: z.string().min(1, "Informe a senha"),
-});
-type Form = z.infer<typeof schema>;
+const testimonials: Testimonial[] = [
+  {
+    avatarSrc: "https://randomuser.me/api/portraits/women/44.jpg",
+    name: "Ana Paula",
+    handle: "@anapaula_ops",
+    text: "O despacho por equipes ficou muito mais ágil. Visualizo tudo em tempo real e consigo reorganizar as OS sem sair da tela.",
+  },
+  {
+    avatarSrc: "https://randomuser.me/api/portraits/men/52.jpg",
+    name: "Ricardo Souza",
+    handle: "@ricardotech",
+    text: "O app do técnico no celular é muito prático. Faço check-in, tiro fotos e registro o chip direto no campo.",
+  },
+  {
+    avatarSrc: "https://randomuser.me/api/portraits/men/18.jpg",
+    name: "Carlos Lima",
+    handle: "@carlos_gestao",
+    text: "Relatórios e controle de estoque na mesma plataforma. Acabaram os e-mails e planilhas avulsas.",
+  },
+];
 
 function LoginForm() {
   const router = useRouter();
@@ -23,17 +33,23 @@ function LoginForm() {
   const redirect = searchParams.get("redirect") ?? "/";
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<Form>({
-    resolver: zodResolver(schema),
-  });
+  async function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
 
-  async function submit(data: Form) {
+    if (!email || !password) {
+      toast.error("Preencha e-mail e senha");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ email, password }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -51,72 +67,28 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4">
-      <Label>
-        E-mail
-        <Input
-          {...register("email")}
-          type="email"
-          placeholder="seu@email.com"
-          autoComplete="email"
-          disabled={loading}
-        />
-        {errors.email && (
-          <span className="text-[11px] text-red">{errors.email.message}</span>
-        )}
-      </Label>
-      <Label>
-        Senha
-        <Input
-          {...register("password")}
-          type="password"
-          placeholder="••••••••"
-          autoComplete="current-password"
-          disabled={loading}
-        />
-        {errors.password && (
-          <span className="text-[11px] text-red">{errors.password.message}</span>
-        )}
-      </Label>
-      <Button type="submit" className="mt-2 w-full" disabled={loading}>
-        {loading ? "Entrando..." : "Entrar"}
-      </Button>
-    </form>
+    <SignInPage
+      title={
+        <span className="flex items-center gap-4">
+          <span className="size-12 rounded-md bg-onyx grid place-items-center shrink-0">
+            <LionShield className="size-8 text-silver" />
+          </span>
+          <span className="font-semibold tracking-tight">Guardião</span>
+        </span>
+      }
+      description="Acesse sua conta para gerenciar ordens de serviço, equipes e estoque."
+      heroImageSrc="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=2160&q=80"
+      testimonials={testimonials}
+      onSignIn={handleSignIn}
+      loading={loading}
+    />
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="grid min-h-screen place-items-center bg-panel px-4">
-      <div className="w-full max-w-sm rounded-lg border border-line bg-panel-soft p-8 shadow-sm">
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="size-16 rounded-md bg-onyx grid place-items-center">
-            <LionShield className="size-10 text-silver" />
-          </div>
-          <div className="text-center">
-            <h1 className="text-[11px] font-semibold tracking-[0.28em] text-ink uppercase">GUARDIÃO</h1>
-            <p className="font-mono-tabular text-[9px] uppercase tracking-[0.22em] text-muted mt-0.5">Service Ops</p>
-          </div>
-        </div>
-        <Suspense fallback={<div className="h-32 animate-pulse rounded-[12px] bg-panel-soft" />}>
-          <LoginForm />
-        </Suspense>
-        <div className="mt-6 rounded-[12px] bg-panel p-3 text-[11px] text-muted">
-          <strong className="text-ink">Usuários de demonstração</strong>
-          <div className="mt-1 grid grid-cols-2 gap-1">
-            {[
-              ["admin@controle.com", "admin123"],
-              ["estoque@controle.com", "estoque123"],
-              ["tecnico@controle.com", "tecnico123"],
-              ["atendimento@controle.com", "atend123"],
-            ].map(([email, pass]) => (
-              <span key={email}>
-                {email.split("@")[0]}: <code>{pass}</code>
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <Suspense fallback={<div className="grid min-h-screen place-items-center text-muted-foreground">Carregando...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
