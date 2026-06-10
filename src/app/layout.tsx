@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Guardião · Service Ops",
   description:
-    "Sistema de ordens de servico, estoque com QR Code, agenda por equipes e app do tecnico.",
+    "Gestão visual de ordens de serviço, despacho por equipes e controle de estoque.",
 };
 
 export const viewport: Viewport = {
