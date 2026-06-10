@@ -48,3 +48,4 @@ backups/*.sql.gz
 backups/*.tar.gz
 uploads/
 certbot/letsencrypt/
+backend-senior/.next/

@@ -44,10 +44,12 @@ ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
-ufw allow 80/tcp   comment "HTTP"
-ufw allow 443/tcp  comment "HTTPS"
+ufw allow 80/tcp    comment "HTTP"
+ufw allow 443/tcp   comment "HTTPS"
+ufw allow 3001/tcp  comment "Uptime Kuma"
+ufw allow 3200/tcp  comment "Grafana"
 ufw --force enable
-info "Firewall configurado (SSH + 80 + 443)"
+info "Firewall configurado (SSH + 80 + 443 + 3001 + 3200)"
 
 step "3/7 — Criando diretórios"
 mkdir -p backups uploads certbot/www certbot/letsencrypt nginx/conf.d
