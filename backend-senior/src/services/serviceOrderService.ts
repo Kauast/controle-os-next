@@ -1,6 +1,6 @@
 import { Priority, Status } from '@prisma/client';
 import dayjs from 'dayjs';
-import { ClientService } from './clientService';
+import { ChipService } from './chipService';
 import {
   canTransition,
   createOSSchema,
@@ -106,10 +106,10 @@ export class ServiceOrderService {
 
       const finalOS = await tx.serviceOrder.findUnique({ where: { id } });
 
-      // Quando OS é concluída, salva o chipId no perfil do cliente
+      // Quando OS é concluída com chipId, cria/atualiza registro de Chip
       if (newStatus === 'COMPLETED' && os.chipId) {
-        const clientService = new ClientService();
-        await clientService.addChipId(os.clientId, os.chipId);
+        const chipService = new ChipService();
+        await chipService.createFromOS(os.chipId, os.clientId, os.id);
       }
 
       return finalOS;

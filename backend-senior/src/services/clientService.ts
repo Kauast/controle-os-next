@@ -16,7 +16,6 @@ export const createClientSchema = z.object({
 export const updateClientSchema = createClientSchema.partial().extend({
   isBlocked: z.boolean().optional(),
   blockedReason: z.string().optional(),
-  chipIds: z.array(z.string()).optional(),
 });
 
 const importClientSchema = z.object({
@@ -64,16 +63,6 @@ export class ClientService {
     return { created, skipped, errors };
   }
 
-  async addChipId(clientId: string, chipId: string) {
-    const client = await prisma.client.findUnique({ where: { id: clientId } });
-    if (!client) return;
-    if (client.chipIds.includes(chipId)) return;
-    await prisma.client.update({
-      where: { id: clientId },
-      data: { chipIds: { push: chipId } },
-    });
-  }
-
   async list(filters: { page?: number; limit?: number; search?: string }) {
     const page = filters.page ?? 1;
     const limit = Math.min(filters.limit ?? 10, 100);
@@ -105,6 +94,10 @@ export class ClientService {
           orderBy: { createdAt: 'desc' },
           take: 10,
           include: { technician: true },
+        },
+        chips: {
+          orderBy: { installedAt: 'desc' },
+          include: { serviceOrder: { select: { id: true, number: true } } },
         },
       },
     });

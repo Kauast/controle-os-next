@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Save, Trash2, Search, UserCheck, UserX, Upload, Cpu } from "lucide-react";
+import { Plus, Save, Trash2, Search, UserCheck, UserX, Upload, Cpu, Wifi, WifiOff, Wrench } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   useClients,
+  useClient,
   useCreateClient,
   useUpdateClient,
   useDeleteClient,
@@ -20,6 +21,7 @@ import {
   type Client,
   type ImportClientRow,
 } from "@/hooks/useClients";
+import { useCreateChip, useDeleteChip, type Chip } from "@/hooks/useChips";
 import { useDebounce } from "@/hooks/useDebounce";
 
 const clientSchema = z.object({
@@ -267,10 +269,10 @@ export function ClientsPanel() {
                     {client.phone && ` · ${client.phone}`}
                     {client.city && ` · ${client.city}${client.state ? `/${client.state}` : ""}`}
                   </small>
-                  {client.chipIds.length > 0 && (
+                  {(client.chips?.length ?? 0) > 0 && (
                     <small className="flex items-center gap-1 text-[11px] text-teal">
                       <Cpu className="size-2.5" />
-                      {client.chipIds.length} chip{client.chipIds.length > 1 ? "s" : ""}
+                      {client.chips.length} chip{client.chips.length > 1 ? "s" : ""}
                     </small>
                   )}
                 </span>
@@ -446,6 +448,15 @@ export function ClientsPanel() {
   );
 }
 
+const chipFormSchema = z.object({
+  iccid: z.string().min(3, "ICCID obrigatorio"),
+  phoneNumber: z.string().optional(),
+  operator: z.string().optional(),
+  model: z.string().optional(),
+  notes: z.string().optional(),
+});
+type ChipForm = z.input<typeof chipFormSchema>;
+
 function ClientDetail({
   client,
   onEdit,
@@ -457,75 +468,159 @@ function ClientDetail({
   onDelete: () => void;
   isDeleting: boolean;
 }) {
-  const { data: full } = useClients(client.name);
-  const fullClient = full?.clients.find((c) => c.id === client.id) ?? client;
+  const { data: fullClient } = useClient(client.id);
+  const fc = fullClient ?? client;
+
+  const [showChipForm, setShowChipForm] = useState(false);
+  const createChip = useCreateChip();
+  const deleteChip = useDeleteChip();
+
+  const {
+    register: regChip,
+    handleSubmit: handleChipSubmit,
+    reset: resetChip,
+    formState: { errors: chipErrors },
+  } = useForm<ChipForm>({ resolver: zodResolver(chipFormSchema) });
+
+  function onSubmitChip(data: ChipForm) {
+    createChip.mutate(
+      { ...data, clientId: client.id },
+      {
+        onSuccess: () => {
+          setShowChipForm(false);
+          resetChip();
+        },
+      }
+    );
+  }
+
+  const chips: Chip[] = (fc as Client & { chips?: Chip[] }).chips ?? [];
 
   return (
     <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-panel-soft/40 p-4">
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <span className="text-xs uppercase text-muted">Cliente</span>
-          <strong className="block truncate text-sm text-ink">{fullClient.name}</strong>
+          <strong className="block truncate text-sm text-ink">{fc.name}</strong>
         </div>
-        <Badge tone={fullClient.isBlocked ? "red" : "teal"}>
-          {fullClient.isBlocked ? <UserX className="size-3" /> : <UserCheck className="size-3" />}
-          {fullClient.isBlocked ? "Bloqueado" : "Ativo"}
+        <Badge tone={fc.isBlocked ? "red" : "teal"}>
+          {fc.isBlocked ? <UserX className="size-3" /> : <UserCheck className="size-3" />}
+          {fc.isBlocked ? "Bloqueado" : "Ativo"}
         </Badge>
       </div>
 
       <div className="flex flex-col gap-1.5 text-sm">
-        <Row label="Codigo/Doc" value={fullClient.document} />
-        {fullClient.contactName && <Row label="Responsavel" value={fullClient.contactName} />}
-        {fullClient.phone && <Row label="Telefone" value={fullClient.phone} />}
-        {fullClient.email && <Row label="E-mail" value={fullClient.email} />}
-        {(fullClient.address || fullClient.neighborhood) && (
+        <Row label="Codigo/Doc" value={fc.document} />
+        {fc.contactName && <Row label="Responsavel" value={fc.contactName} />}
+        {fc.phone && <Row label="Telefone" value={fc.phone} />}
+        {fc.email && <Row label="E-mail" value={fc.email} />}
+        {(fc.address || fc.neighborhood) && (
           <Row
             label="Endereco"
-            value={[fullClient.address, fullClient.neighborhood, fullClient.city, fullClient.state]
-              .filter(Boolean)
-              .join(", ")}
+            value={[fc.address, fc.neighborhood, fc.city, fc.state].filter(Boolean).join(", ")}
           />
         )}
-        {fullClient.city && !fullClient.address && (
-          <Row label="Cidade" value={`${fullClient.city}${fullClient.state ? `/${fullClient.state}` : ""}`} />
+        {fc.city && !fc.address && (
+          <Row label="Cidade" value={`${fc.city}${fc.state ? `/${fc.state}` : ""}`} />
         )}
-        <Row
-          label="Cadastro"
-          value={new Date(fullClient.createdAt).toLocaleDateString("pt-BR")}
-        />
+        <Row label="Cadastro" value={new Date(fc.createdAt).toLocaleDateString("pt-BR")} />
       </div>
 
-      {/* Chips instalados */}
-      {fullClient.chipIds.length > 0 && (
-        <div className="rounded-[10px] border border-teal/30 bg-teal-soft/20 p-3">
-          <div className="mb-2 flex items-center gap-1.5">
+      {/* ── Seção de Chips ── */}
+      <div className="rounded-[10px] border border-teal/30 bg-teal-soft/10 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
             <Cpu className="size-3.5 text-teal" />
             <strong className="text-xs text-teal">
-              Chips instalados ({fullClient.chipIds.length})
+              Chips{chips.length > 0 ? ` (${chips.length})` : ""}
             </strong>
           </div>
-          <div className="flex flex-col gap-1">
-            {fullClient.chipIds.map((chip, i) => (
-              <span key={i} className="font-mono text-[11px] text-ink">
-                {chip}
-              </span>
-            ))}
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setShowChipForm((v) => !v)}
+          >
+            <Plus className="size-3" /> Adicionar
+          </Button>
         </div>
-      )}
 
-      {fullClient.isBlocked && fullClient.blockedReason && (
+        {showChipForm && (
+          <form
+            onSubmit={handleChipSubmit(onSubmitChip)}
+            className="mb-3 flex flex-col gap-2 rounded-[8px] border border-teal/20 bg-panel p-3"
+          >
+            <Label className="text-[11px]">
+              ICCID <span className="text-red">*</span>
+              <Input
+                {...regChip("iccid")}
+                placeholder="89550400..."
+                className="h-7 text-xs"
+              />
+              {chipErrors.iccid && (
+                <span className="text-[10px] text-red">{chipErrors.iccid.message}</span>
+              )}
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Label className="text-[11px]">
+                Operadora
+                <Input {...regChip("operator")} placeholder="Vivo, Claro..." className="h-7 text-xs" />
+              </Label>
+              <Label className="text-[11px]">
+                Numero
+                <Input {...regChip("phoneNumber")} placeholder="(68) 9..." className="h-7 text-xs" />
+              </Label>
+            </div>
+            <Label className="text-[11px]">
+              Modelo
+              <Input {...regChip("model")} placeholder="SIM micro, nano..." className="h-7 text-xs" />
+            </Label>
+            <Label className="text-[11px]">
+              Observacoes
+              <Input {...regChip("notes")} className="h-7 text-xs" />
+            </Label>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" className="flex-1 h-7 text-xs" disabled={createChip.isPending}>
+                <Save className="size-3" /> Salvar chip
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => { setShowChipForm(false); resetChip(); }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {chips.length === 0 && !showChipForm && (
+          <p className="text-center text-[11px] text-muted py-2">
+            Nenhum chip registrado para este cliente.
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {chips.map((chip) => (
+            <ChipCard key={chip.id} chip={chip} onDelete={() => deleteChip.mutate(chip.id)} />
+          ))}
+        </div>
+      </div>
+
+      {fc.isBlocked && fc.blockedReason && (
         <p className="rounded-[8px] bg-red-soft/40 p-2.5 text-xs text-red">
-          Motivo do bloqueio: {fullClient.blockedReason}
+          Motivo do bloqueio: {fc.blockedReason}
         </p>
       )}
 
       {/* Historico de OS */}
-      {fullClient.serviceOrders && fullClient.serviceOrders.length > 0 && (
+      {fc.serviceOrders && fc.serviceOrders.length > 0 && (
         <div>
           <strong className="mb-1.5 block text-xs text-muted uppercase">Historico de OS</strong>
           <div className="flex flex-col gap-1.5">
-            {fullClient.serviceOrders.slice(0, 5).map((os) => (
+            {fc.serviceOrders.slice(0, 5).map((os) => (
               <div
                 key={os.id}
                 className="flex items-center justify-between rounded-[8px] border border-line bg-panel p-2 text-xs"
@@ -562,15 +657,76 @@ function ClientDetail({
         <Button className="flex-1" size="sm" onClick={onEdit}>
           <Save /> Editar
         </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          disabled={isDeleting}
-          onClick={onDelete}
-        >
+        <Button variant="danger" size="sm" disabled={isDeleting} onClick={onDelete}>
           <Trash2 /> Excluir
         </Button>
       </div>
+    </div>
+  );
+}
+
+const CHIP_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Ativo",
+  INACTIVE: "Inativo",
+  MAINTENANCE: "Manutencao",
+};
+
+function ChipCard({ chip, onDelete }: { chip: Chip; onDelete: () => void }) {
+  const toneMap: Record<string, "teal" | "red" | "amber"> = {
+    ACTIVE: "teal",
+    INACTIVE: "red",
+    MAINTENANCE: "amber",
+  };
+  const IconMap: Record<string, typeof Wifi> = {
+    ACTIVE: Wifi,
+    INACTIVE: WifiOff,
+    MAINTENANCE: Wrench,
+  };
+  const StatusIcon = IconMap[chip.status] ?? Cpu;
+
+  return (
+    <div className="rounded-[8px] border border-line bg-panel p-2.5 text-xs">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Cpu className="size-3 shrink-0 text-teal" />
+          <span className="font-mono font-semibold text-ink truncate">{chip.iccid}</span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge tone={toneMap[chip.status] ?? "amber"}>
+            <StatusIcon className="size-2.5" />
+            {CHIP_STATUS_LABEL[chip.status] ?? chip.status}
+          </Badge>
+          <button
+            onClick={onDelete}
+            className="rounded p-0.5 text-muted hover:text-red transition-colors"
+            title="Remover chip"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-muted">
+        {chip.operator && (
+          <><span className="text-muted/70">Operadora</span><span className="text-ink">{chip.operator}</span></>
+        )}
+        {chip.phoneNumber && (
+          <><span className="text-muted/70">Numero</span><span className="text-ink">{chip.phoneNumber}</span></>
+        )}
+        {chip.model && (
+          <><span className="text-muted/70">Modelo</span><span className="text-ink">{chip.model}</span></>
+        )}
+        {chip.installedAt && (
+          <><span className="text-muted/70">Instalado</span><span className="text-ink">{new Date(chip.installedAt).toLocaleDateString("pt-BR")}</span></>
+        )}
+        {chip.serviceOrder && (
+          <><span className="text-muted/70">Via OS</span><span className="text-teal">OS-{String(chip.serviceOrder.number).padStart(4, "0")}</span></>
+        )}
+      </div>
+
+      {chip.notes && (
+        <p className="mt-1.5 text-[11px] text-muted italic">{chip.notes}</p>
+      )}
     </div>
   );
 }

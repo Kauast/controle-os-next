@@ -18,7 +18,6 @@ model Client {
   city          String?
   state         String?
   contactName   String?
-  chipIds       String[]  @default([])
   isBlocked     Boolean   @default(false)
   blockedReason String?
   createdAt     DateTime  @default(now())
@@ -26,6 +25,33 @@ model Client {
 
   serviceOrders ServiceOrder[]
   payments      Payment[]
+  chips         Chip[]
+}
+
+model Chip {
+  id             String     @id @default(cuid())
+  iccid          String     @unique
+  phoneNumber    String?
+  operator       String?
+  model          String?
+  status         ChipStatus @default(ACTIVE)
+  notes          String?
+
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id])
+
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+
+  installedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+enum ChipStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
 }
 
 model Technician {
@@ -81,6 +107,7 @@ model ServiceOrder {
   payments         Payment[]
   materialRequests MaterialRequest[]
   stockMovements   StockMovement[]
+  chips            Chip[]
 }
 
 enum Priority {

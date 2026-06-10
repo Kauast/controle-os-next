@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { toast } from "sonner";
+import type { Chip } from "@/hooks/useChips";
 
 export interface Client {
   id: string;
@@ -13,7 +14,7 @@ export interface Client {
   city?: string;
   state?: string;
   contactName?: string;
-  chipIds: string[];
+  chips: Chip[];
   isBlocked: boolean;
   blockedReason?: string;
   createdAt: string;
