@@ -49,3 +49,4 @@ backups/*.tar.gz
 uploads/
 certbot/letsencrypt/
 backend-senior/.next/
+docker-compose.override.yml
