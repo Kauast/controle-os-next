@@ -54,6 +54,10 @@ certbot/letsencrypt/
 backend-senior/.next/
 docker-compose.override.yml
 
+# Backups de .env (seguranca)
+.env.bak*
+.env.*.bak
+
 # npm notice junk files
 11.16.0
 backend-senior@1.0.0
