@@ -111,9 +111,6 @@ export async function buildApp(): Promise<FastifyInstance> {
       iss: issuer,
       aud: audience,
     },
-    verify: {
-      ...(isProd ? { iss: issuer, aud: audience } : {}),
-    },
   });
 
   // Regra 4: liveness (processo vivo) e readiness (dependências OK).
