@@ -81,7 +81,7 @@ export class AiService {
         throw new AppError('A IA recusou processar esta descrição.', 422);
       }
 
-      const textBlock = response.content.find((b) => b.type === 'text');
+      const textBlock = response.content.find((b: { type: string }) => b.type === 'text');
       if (!textBlock || textBlock.type !== 'text') {
         throw new AppError('Resposta da IA sem conteúdo de texto.', 502);
       }
