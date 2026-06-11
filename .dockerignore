@@ -1,0 +1,39 @@
+# ── Diretórios inteiros que nunca devem entrar em imagem ──
+.git
+.backups
+backups
+uploads
+certbot
+.claude
+.grafana
+node_modules
+.vercel
+
+# ── Arquivos .env com secrets ──
+.env
+.env.*
+!.env.example
+backend-senior/.env
+
+# ── Build outputs e caches ──
+.next
+out
+out-mobile
+coverage
+
+# ── Lixo de OS e editor ──
+.DS_Store
+Thumbs.db
+*.pem
+
+# ── Docker compose override (pode ter secrets locais) ──
+docker-compose.override.yml
+
+# ── IDEs ──
+.vscode
+.idea
+*.swp
+*.swo
+
+# ── npm ──
+npm-debug.log*

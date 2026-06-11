@@ -32,6 +32,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 const MAX_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
+const REFRESH_TOKEN_TTL_DAYS = 7;
 
 export class AuthService {
   async register(data: RegisterInput) {
@@ -53,7 +54,7 @@ export class AuthService {
     }
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
-      throw new AppError('Conta bloqueada. Tente novamente em ' + minutes + ' minuto(s).', 423);
+      throw new AppError(`Conta bloqueada. Tente novamente em ${minutes} minuto(s).`, 423);
     }
     const valid = await bcrypt.compare(data.password, user.password);
     if (!valid) {
@@ -66,13 +67,67 @@ export class AuthService {
           lockedUntil: locked ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000) : null,
         },
       });
-      await audit({ userId: user.id, userEmail: user.email, action: 'LOGIN_FALHOU', detail: 'Tentativa ' + attempts + '/' + MAX_ATTEMPTS, ip });
-      if (locked) throw new AppError('Conta bloqueada por ' + LOCK_MINUTES + ' minutos apos ' + MAX_ATTEMPTS + ' tentativas.', 423);
+      await audit({
+        userId: user.id,
+        userEmail: user.email,
+        action: 'LOGIN_FALHOU',
+        detail: `Tentativa ${attempts}/${MAX_ATTEMPTS}`,
+        ip,
+      });
+      if (locked) throw new AppError(`Conta bloqueada por ${LOCK_MINUTES} minutos apos ${MAX_ATTEMPTS} tentativas.`, 423);
       throw new AppError('Credenciais invalidas', 401);
     }
     await prisma.user.update({ where: { id: user.id }, data: { loginAttempts: 0, lockedUntil: null } });
     await audit({ userId: user.id, userEmail: user.email, action: 'LOGIN', detail: 'Login realizado com sucesso', ip });
     return { id: user.id, name: user.name, email: user.email, role: user.role };
+  }
+
+  async issueRefreshToken(userId: string): Promise<string> {
+    const token = crypto.randomBytes(40).toString('hex');
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+    await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
+    return token;
+  }
+
+  async rotateRefreshToken(token: string) {
+    const record = await prisma.refreshToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+    if (!record || record.revokedAt || record.expiresAt < new Date()) {
+      throw new AppError('Refresh token invalido ou expirado', 401);
+    }
+    if (!record.user.active) {
+      throw new AppError('Usuario inativo', 401);
+    }
+    await prisma.refreshToken.update({
+      where: { id: record.id },
+      data: { revokedAt: new Date() },
+    });
+    const newToken = await this.issueRefreshToken(record.userId);
+    return {
+      user: {
+        id: record.user.id,
+        name: record.user.name,
+        email: record.user.email,
+        role: record.user.role,
+      },
+      refreshToken: newToken,
+    };
+  }
+
+  async revokeRefreshToken(token: string) {
+    await prisma.refreshToken.updateMany({
+      where: { token, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeAllUserRefreshTokens(userId: string) {
+    await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   async forgotPassword(email: string, baseUrl: string, ip?: string) {
@@ -99,12 +154,13 @@ export class AuthService {
       throw new AppError('Link invalido ou expirado', 400);
     }
     const hashed = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id: record.userId },
-      data: { password: hashed, loginAttempts: 0, lockedUntil: null },
-    });
-    await prisma.passwordResetToken.update({ where: { token }, data: { usedAt: new Date() } });
-    const user = await prisma.user.findUnique({ where: { id: record.userId } });
-    await audit({ userId: record.userId, userEmail: user?.email, action: 'SENHA_REDEFINIDA', ip });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { password: hashed, loginAttempts: 0, lockedUntil: null, passwordChangedAt: new Date() },
+      }),
+      prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+    ]);
+    await audit({ userId: record.userId, action: 'SENHA_REDEFINIDA', ip });
   }
 }

@@ -2,7 +2,22 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
 
-const DEFAULT_PASS = process.env.SEED_DEFAULT_PASS ?? 'Rb@2025#ControleOS';
+// Valor padrão hardcoded — NUNCA deve ser usado em produção.
+const KNOWN_DEFAULT = 'Rb@2025#ControleOS';
+const isProd = process.env.NODE_ENV === 'production';
+
+if (
+  isProd &&
+  (!process.env.SEED_DEFAULT_PASS || process.env.SEED_DEFAULT_PASS === KNOWN_DEFAULT)
+) {
+  console.error(
+    'FATAL: SEED_DEFAULT_PASS não definido ou usa o valor padrão hardcoded. ' +
+    'Defina SEED_DEFAULT_PASS (ou senhas individuais SEED_ADMIN_PASS, etc.) no ambiente de produção.',
+  );
+  process.exit(1);
+}
+
+const DEFAULT_PASS = process.env.SEED_DEFAULT_PASS ?? KNOWN_DEFAULT;
 
 const users = [
   { email: 'admin@controle.com',       password: process.env.SEED_ADMIN_PASS     ?? DEFAULT_PASS, role: 'ADMIN'      },

@@ -1,0 +1,55 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: critical
+      repeat_interval: 1h
+
+receivers:
+  # ── default (alerts com severity="warning" ou sem severidade) ──
+  - name: default
+    # Opção A: Uptime Kuma push (cole o Push URL do monitor)
+    webhook_configs:
+      - url: '${UPTIME_KUMA_PUSH_URL:-http://uptime-kuma:3001/api/push/REPLACE_ME}'
+        send_resolved: true
+
+    # Opção B: Slack (descomente e cole sua webhook URL)
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/COLE_SUA_WEBHOOK_URL_AQUI'
+    #     channel: '#alerts'
+    #     title: '{{ .GroupLabels.alertname }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+    #     send_resolved: true
+
+    # Opção C: Email via SMTP (descomente e configure global.smtp_smarthost)
+    # email_configs:
+    #   - to: 'oncall@exemplo.com'
+    #     send_resolved: true
+
+  # ── critical (alerts com severity="critical") ──
+  - name: critical
+    webhook_configs:
+      - url: '${UPTIME_KUMA_CRITICAL_PUSH_URL:-http://uptime-kuma:3001/api/push/REPLACE_ME_CRITICAL}'
+        send_resolved: true
+
+    # Slack para alertas críticos:
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/COLE_SUA_WEBHOOK_URL_AQUI'
+    #     channel: '#incidents'
+    #     title: '[CRITICAL] {{ .GroupLabels.alertname }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+    #     send_resolved: true
+
+inhibit_rules:
+  # Silencia warnings de um alvo que já tem um critical ativo.
+  - source_matchers: [severity = "critical"]
+    target_matchers: [severity = "warning"]
+    equal: ['alertname', 'service']

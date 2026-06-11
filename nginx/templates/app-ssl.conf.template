@@ -103,6 +103,42 @@ server {
         access_log off;
     }
 
+    # Backend monitoring (Prometheus, health checks)
+    location /metrics {
+        set $upstream_backend backend:3333;
+        proxy_pass http://$upstream_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header x-metrics-token   "${METRICS_TOKEN}";
+    }
+
+    location /health {
+        set $upstream_backend backend:3333;
+        proxy_pass http://$upstream_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API backend
+    location /api {
+        set $upstream_backend backend:3333;
+        proxy_pass http://$upstream_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        client_max_body_size 20m;
+    }
+
     location / {
         set $upstream frontend:3000;
         proxy_pass http://$upstream;

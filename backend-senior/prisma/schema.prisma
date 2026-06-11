@@ -16,10 +16,25 @@ model User {
   active        Boolean   @default(true)
   loginAttempts Int       @default(0)
   lockedUntil   DateTime?
+  passwordChangedAt DateTime?
   createdAt     DateTime  @default(now())
 
   passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
   auditLogs           AuditLog[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 model PasswordResetToken {

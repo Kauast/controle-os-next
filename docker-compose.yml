@@ -49,6 +49,9 @@ services:
       ALLOWED_ORIGINS: https://${DOMAIN}
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: https://${DOMAIN}/uploads
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
+      METRICS_TOKEN: ${METRICS_TOKEN}
       SEED_ADMIN_PASS: ${SEED_ADMIN_PASS}
       SEED_STOCK_PASS: ${SEED_STOCK_PASS}
       SEED_TECH_PASS: ${SEED_TECH_PASS}
@@ -103,6 +106,7 @@ services:
       - "3200:3200"
     environment:
       DOMAIN: ${DOMAIN}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/templates:/etc/nginx/templates:ro
@@ -130,12 +134,27 @@ services:
     restart: unless-stopped
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=30d
       - --web.enable-lifecycle
+    depends_on:
+      - alertmanager
+    networks:
+      - app
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
     networks:
       - app
 
@@ -234,6 +253,7 @@ volumes:
   redis_data:
   uptime_kuma_data:
   prometheus_data:
+  alertmanager_data:
   grafana_data:
 
 networks:
