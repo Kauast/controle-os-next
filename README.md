@@ -177,6 +177,108 @@ bash scripts/setup-ssl.sh
 > ufw delete allow 3200/tcp
 > ```
 
+---
+
+## App Mobile (Android APK / PWA)
+
+O app do técnico é gerado como **exportação estática do Next.js** empacotada com **Capacitor 8**.  
+A URL do backend é fixada em tempo de build via variável de ambiente — o APK **não usa a rota `/api/backend` do Next.js**.
+
+### Arquitetura
+
+| Aspecto | Web (browser) | Mobile (APK) |
+|---------|--------------|-------------|
+| Rota de API | `/api/backend` (proxy Next.js) | `NEXT_PUBLIC_FASTIFY_URL/api` (direto) |
+| Auth | Cookie `httpOnly` | Bearer token no header `Authorization` |
+| Fotos/Assinaturas | Não aplicável | Multipart form-data (sem base64 permanente) |
+| Armazenamento de token | N/A | Capacitor Preferences (criptografado) |
+| Offline | N/A | Fila local (localStorage) com sync ao reconectar |
+
+### Variáveis de ambiente mobile
+
+Crie `.env.mobile` na raiz do projeto:
+
+```bash
+# URL pública do backend — deve ser HTTPS em produção
+NEXT_PUBLIC_FASTIFY_URL=https://api.seu-dominio.com
+```
+
+### Permissões Android (`AndroidManifest.xml`)
+
+O manifesto já inclui todas as permissões necessárias:
+
+- `INTERNET` + `ACCESS_NETWORK_STATE` — comunicação com o backend
+- `CAMERA` — fotos de OS
+- `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` — check-in/checkout
+- `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE` — fotos (até API 32/29)
+- `VIBRATE` — feedback háptico
+
+### Build do APK
+
+```bash
+# 1. Exportação estática do Next.js com URL do backend fixada
+NEXT_PUBLIC_FASTIFY_URL=https://api.seu-dominio.com npm run build:mobile
+
+# 2. Sincronizar com projeto Android
+npm run cap:sync
+
+# 3. Abrir no Android Studio para gerar APK/AAB
+npm run cap:open:android
+# Ou gerar APK debug direto:
+cd android && ./gradlew assembleDebug
+```
+
+O APK gerado fica em `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### Autenticação no app
+
+O login no APK usa Bearer token:
+
+```
+POST /api/auth/login  →  { token: "eyJ..." }
+```
+
+O token é armazenado via `Capacitor.Preferences` e enviado em todas as requisições:
+
+```
+Authorization: Bearer eyJ...
+```
+
+O endpoint `/api/auth/me` retorna o perfil do usuário incluindo `technician` (se aplicável).
+
+### Upload de fotos e assinaturas
+
+As fotos são capturadas com `@capacitor/camera` (JPEG comprimido a 70%) e enviadas como **multipart/form-data** para `/api/uploads`:
+
+```
+POST /api/uploads
+Content-Type: multipart/form-data
+Authorization: Bearer <token>
+
+file: <blob JPEG>
+```
+
+Resposta: `{ url: "https://api.dominio.com/uploads/2026/06/uuid.jpg" }`
+
+O backend valida magic bytes (JPEG/PNG/WebP/PDF) e salva em `uploads/{ano}/{mes}/`.
+
+### Offline e sync
+
+Quando não há internet (detectado por `@capacitor/network`), as ações são salvas em uma fila local:
+
+1. Check-in/checkout → salvo com timestamp e coordenadas GPS
+2. Atualização de status de OS → salvo na fila
+3. Upload de foto → foto armazenada em base64 **temporariamente** na fila
+
+Ao reconectar, `offlineQueue.sync()` executa as ações na ordem em que foram criadas. Ações com erro são re-enfileiradas até 3 tentativas.
+
+### Geolocalização
+
+O check-in captura coordenadas via `@capacitor/geolocation` e abre rotas com:
+
+1. **Coordenadas GPS** — `https://maps.google.com/?daddr=lat,lng` (preferencial)
+2. **Endereço** — fallback quando GPS não está disponível
+
 ### 7. Backup e restore
 
 **Backup automático** — diário às 00:00, retendo:
