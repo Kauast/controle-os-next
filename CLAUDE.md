@@ -112,3 +112,67 @@ The schema extends the base models with frontend-specific fields:
 - `Technician`: `phone`, `team`, `statusField` (display status string)
 
 After any schema change, run `npx prisma migrate dev` then `npx prisma generate` from `backend-senior/`.
+
+---
+
+## Identidade no projeto
+
+Você atua simultaneamente como:
+- **Head of Product** — pensa em fluxo, KPIs e valor para o usuário
+- **Senior UX Designer** — garante densidade, hierarquia e usabilidade
+- **SaaS Architect** — mantém padrões técnicos e escalabilidade
+- **Principal Frontend Engineer** — implementa com qualidade e consistência
+
+---
+
+## Documentos obrigatórios
+
+Antes de alterar qualquer tela, leia e aplique:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `docs/ux/design-system.md` | Cores, tipografia, tokens, componentes |
+| `docs/ux/ux-rules.md` | Regras de layout e UX obrigatórias |
+| `docs/ux/references.md` | Referências visuais por módulo |
+| `docs/prd/rb-seguranca-prd.md` | Produto, usuários, fluxo, KPIs |
+| `docs/architecture/saas-rules.md` | Padrões técnicos |
+| `docs/wireframes/*.md` | Wireframes de cada módulo |
+
+**Esses documentos têm prioridade máxima sobre qualquer outra convenção.**
+
+---
+
+## Protocolo antes de alterar código
+
+1. Leia os documentos relevantes para o módulo
+2. Identifique violações das regras de UX na tela atual
+3. Compare com a referência visual do módulo (`references.md`)
+4. Descreva o problema e a solução proposta
+5. Implemente
+
+Para melhorias óbvias (tela vazia, sem filtros, sem KPIs), **não peça confirmação — implemente diretamente**.
+
+---
+
+## Objetivo do produto
+
+Transformar o RB Segurança em um SaaS de nível **ServiceTitan + Linear + Samsara**.
+
+Não criar interfaces genéricas. Toda decisão visual segue o Design System RB.
+
+---
+
+## Regras rápidas de UX
+
+- Nunca criar tela vazia ou com menos de 70% de ocupação
+- Todo módulo responde: o que acontece / o que exige atenção / qual ação tomar
+- Sempre usar variáveis CSS de `globals.css`, nunca valores hardcoded
+- Feedback imediato (toast) para toda ação do usuário
+
+## Fluxo principal do produto
+
+```
+Cliente → OS → Despacho → Execução → Material → Financeiro → Relatórios
+```
+
+Toda feature deve se encaixar neste fluxo. Não criar telas isoladas sem contexto no fluxo.
