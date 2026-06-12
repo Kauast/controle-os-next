@@ -89,7 +89,7 @@ step "6/7 — Reiniciando nginx com SSL"
 docker compose restart nginx
 info "Nginx recarregado"
 
-step "7/7 — Iniciando backup e monitoramento"
+step "7/8 — Iniciando backup e monitoramento"
 docker compose up -d backup
 info "Backup diário ativado → ./backups/"
 
@@ -100,6 +100,17 @@ info "Stack de monitoramento iniciada"
 CRON_JOB="0 3 * * * cd $(pwd) && tar -czf backups/uploads-\$(date +\\%Y\\%m\\%d).tar.gz uploads/ 2>&1 | logger -t controle-os-backup"
 (crontab -l 2>/dev/null | grep -v "controle-os-backup" | grep -v "uploads-"; echo "$CRON_JOB") | crontab -
 info "Cron de backup de uploads configurado"
+
+step "8/8 — Seed de usuários (apenas primeira instalação)"
+warn "O seed cria os usuários demo com as senhas definidas em SEED_*_PASS."
+warn "Se este servidor já tem dados (restore de backup), responda 'n'."
+read -rp "  Executar seed agora? (s/N) " DO_SEED
+if [[ "${DO_SEED}" == "s" || "${DO_SEED}" == "S" ]]; then
+  docker compose exec backend npm run seed
+  info "Seed executado com sucesso."
+else
+  info "Seed pulado. Para executar depois: docker compose exec backend npm run seed"
+fi
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
