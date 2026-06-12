@@ -2,6 +2,14 @@ global:
   scrape_interval:     15s
   evaluation_interval: 15s
 
+rule_files:
+  - alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 scrape_configs:
   - job_name: node
     static_configs:
@@ -20,7 +28,9 @@ scrape_configs:
 
   - job_name: backend
     metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials: METRICS_TOKEN_PLACEHOLDER
     static_configs:
       - targets: ['backend:3333']
-    # Só coleta se o backend expor /metrics (opcional por enquanto)
     honor_timestamps: true
