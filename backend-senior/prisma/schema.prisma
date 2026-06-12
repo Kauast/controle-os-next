@@ -7,61 +7,199 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  password      String
-  role          Role      @default(ATTENDANT)
-  active        Boolean   @default(true)
-  loginAttempts Int       @default(0)
-  lockedUntil   DateTime?
-  passwordChangedAt DateTime?
-  createdAt     DateTime  @default(now())
+model Tenant {
+  id        String       @id @default(cuid())
+  slug      String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
+  company             Company?
+  users               User[]
+  roles               Role[]
+  clients             Client[]
+  technicians         Technician[]
+  teams               Team[]
+  serviceOrders       ServiceOrder[]
+  products            Product[]
+  productCategories   ProductCategory[]
+  stockMovements      StockMovement[]
+  stockReservations   StockReservation[]
+  materialRequests    MaterialRequest[]
+  chips               Chip[]
+  payments            Payment[]
+  invoices            Invoice[]
+  financialMovements  FinancialMovement[]
+  auditLogs           AuditLog[]
+  attachments         Attachment[]
+}
+
+model Company {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  legalName       String
+  tradeName       String?
+  document        String   @unique
+  defaultTimezone String   @default("America/Sao_Paulo")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  deletedBy       String?
+  version         Int      @default(1)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?
+  version     Int      @default(1)
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, deletedAt])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id                String   @id @default(cuid())
+  tenantId          String
+  name              String?
+  email             String
+  password          String
+  role              RoleCode @default(ATTENDANT)
+  active            Boolean  @default(true)
+  loginAttempts     Int      @default(0)
+  failedLoginCount  Int      @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+  deletedBy         String?
+  version           Int      @default(1)
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
   auditLogs           AuditLog[]
+  userRoles           UserRole[]
+  technician          Technician?
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role, active])
+  @@index([tenantId, deletedAt])
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  assignedBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, map: "UserRole_user_fkey")
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
 }
 
 model RefreshToken {
-  id        String    @id @default(cuid())
-  token     String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
+  id         String    @id @default(cuid())
+  tenantId   String
+  token      String    @unique
+  userId     String
+  sessionId  String
+  ip         String?
+  userAgent  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  createdAt  DateTime  @default(now())
 
-  @@index([userId])
-  @@index([token])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@index([sessionId])
 }
 
 model PasswordResetToken {
   id        String    @id @default(cuid())
+  tenantId  String
   token     String    @unique
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
+  tenantId  String
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
   userEmail String?
-  action    String
+  entity    String?
+  entityId  String?
+  action    AuditAction
   detail    String?
+  before    Json?
+  after     Json?
   ip        String?
-  createdAt DateTime @default(now())
+  userAgent String?
+  createdAt DateTime    @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entity])
+  @@index([tenantId, entityId])
+  @@index([tenantId, createdAt])
 }
 
 model Client {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
+  tenantId      String
   name          String
-  document      String    @unique
+  document      String
   phone         String?
   email         String?
   address       String?
@@ -69,45 +207,80 @@ model Client {
   city          String?
   state         String?
   contactName   String?
-  isBlocked     Boolean   @default(false)
+  isBlocked     Boolean  @default(false)
   blockedReason String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?
+  version       Int      @default(1)
 
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   serviceOrders ServiceOrder[]
   payments      Payment[]
   chips         Chip[]
+  invoices      Invoice[]
+
+  @@unique([tenantId, document])
+  @@index([tenantId, name])
+  @@index([tenantId, deletedAt])
 }
 
 model Chip {
   id             String     @id @default(cuid())
+  tenantId       String
   iccid          String     @unique
   phoneNumber    String?
   operator       String?
   model          String?
   status         ChipStatus @default(ACTIVE)
   notes          String?
-
   clientId       String?
-  client         Client?      @relation(fields: [clientId], references: [id])
-
   serviceOrderId String?
-  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
-
   installedAt    DateTime?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  version        Int        @default(1)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, clientId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
 }
 
-enum ChipStatus {
-  ACTIVE
-  INACTIVE
-  MAINTENANCE
+model Team {
+  id          String     @id @default(cuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  status      TeamStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?
+  version     Int        @default(1)
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  technicians   Technician[]
+  serviceOrders ServiceOrder[]
+  schedules     ServiceOrderSchedule[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
 }
 
 model Technician {
   id              String   @id @default(cuid())
+  tenantId        String
   userId          String   @unique
+  teamId          String?
   name            String
   phone           String   @default("")
   team            String   @default("")
@@ -116,31 +289,40 @@ model Technician {
   maxConcurrentOS Int      @default(5)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  deletedBy       String?
+  version         Int      @default(1)
 
-  serviceOrders ServiceOrder[]
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  teamRelation  Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  serviceOrders ServiceOrder[]        @relation("ServiceOrderTechnician")
+  schedules     ServiceOrderSchedule[]
+
+  @@index([tenantId, teamId, isActive])
+  @@index([tenantId, deletedAt])
 }
 
 model ServiceOrder {
   id                 String     @id @default(cuid())
-  number             Int        @unique @default(autoincrement())
+  tenantId           String
+  number             Int        @default(autoincrement())
   clientId           String
-  client             Client     @relation(fields: [clientId], references: [id])
   technicianId       String?
-  technician         Technician? @relation(fields: [technicianId], references: [id])
+  teamId             String?
   status             Status     @default(OPEN)
   openingDate        DateTime   @default(now())
   dueDate            DateTime
   startDate          DateTime?
   completionDate     DateTime?
   cancellationReason String?
-  totalAmount        Decimal    @default(0) @db.Decimal(10, 2)
+  totalAmount        Decimal    @default(0) @db.Decimal(14, 2)
   clientAuthorized   Boolean    @default(false)
   version            Int        @default(1)
-
   team               String     @default("Sem equipe")
   priority           Priority   @default(NORMAL)
   scheduledTime      String?
-
   description        String?
   checkinAt          DateTime?
   checkoutAt         DateTime?
@@ -148,17 +330,424 @@ model ServiceOrder {
   photoUrls          String[]   @default([])
   clientSignature    String?
   chipId             String?
-
   createdById        String?
-
+  updatedById        String?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+  deletedBy          String?
 
-  items            OSItem[]
-  payments         Payment[]
-  materialRequests MaterialRequest[]
-  stockMovements   StockMovement[]
-  chips            Chip[]
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client            Client                   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  technician        Technician?              @relation("ServiceOrderTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  teamRelation      Team?                    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  items             ServiceOrderItem[]
+  payments          Payment[]
+  invoices          Invoice[]
+  materialRequests  MaterialRequest[]
+  stockMovements    StockMovement[]
+  stockReservations StockReservation[]
+  chips             Chip[]
+  schedules         ServiceOrderSchedule[]
+  executions        ServiceOrderExecution[]
+  attachments       ServiceOrderAttachment[]
+  histories         ServiceOrderHistory[]
+  events            ServiceOrderEvent[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, openingDate])
+  @@index([tenantId, clientId, status])
+  @@index([tenantId, technicianId, status])
+  @@index([tenantId, teamId, status])
+  @@index([tenantId, priority, openingDate])
+  @@index([tenantId, deletedAt])
+}
+
+model ServiceOrderItem {
+  id             String       @id @default(cuid())
+  tenantId       String
+  serviceOrderId String
+  productId      String?
+  description    String
+  quantity       Int          @default(1)
+  unitPrice      Decimal      @db.Decimal(14, 2)
+  itemType       ItemType     @default(SERVICE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  version        Int          @default(1)
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  product      Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("OSItem")
+  @@index([tenantId, serviceOrderId])
+  @@index([tenantId, productId])
+}
+
+model ServiceOrderSchedule {
+  id             String   @id @default(cuid())
+  tenantId       String
+  serviceOrderId String
+  technicianId   String?
+  teamId         String?
+  scheduledStart DateTime
+  scheduledEnd   DateTime?
+  notes          String?
+  isCurrent      Boolean  @default(true)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  version        Int      @default(1)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder ServiceOrder  @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  technician   Technician?   @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, serviceOrderId, isCurrent])
+  @@index([tenantId, technicianId, scheduledStart])
+  @@index([tenantId, teamId, scheduledStart])
+}
+
+model ServiceOrderExecution {
+  id               String   @id @default(cuid())
+  tenantId         String
+  serviceOrderId   String
+  checkinAt        DateTime?
+  checkoutAt       DateTime?
+  checkinLocation  String?
+  checkoutLocation String?
+  notes            String?
+  performedById    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+  deletedBy        String?
+  version          Int      @default(1)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, serviceOrderId, createdAt])
+}
+
+model Attachment {
+  id              String               @id @default(cuid())
+  tenantId        String
+  entityType      AttachmentEntityType
+  entityId        String
+  kind            AttachmentKind       @default(DOCUMENT)
+  fileName        String
+  mimeType        String
+  fileSize        Int
+  storageProvider String
+  storagePath     String
+  hash            String
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  deletedAt       DateTime?
+  deletedBy       String?
+  version         Int                  @default(1)
+
+  tenant                 Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrderLinks      ServiceOrderAttachment[]
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, hash])
+}
+
+model ServiceOrderAttachment {
+  id             String   @id @default(cuid())
+  tenantId       String
+  serviceOrderId String
+  attachmentId   String
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  attachment   Attachment   @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceOrderId, attachmentId])
+  @@index([tenantId, serviceOrderId])
+}
+
+model ServiceOrderHistory {
+  id             String               @id @default(cuid())
+  tenantId       String
+  serviceOrderId String
+  field          String
+  action         AuditAction
+  before         Json?
+  after          Json?
+  changedById    String?
+  createdAt      DateTime             @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, serviceOrderId, createdAt])
+}
+
+model ServiceOrderEvent {
+  id             String                @id @default(cuid())
+  tenantId       String
+  serviceOrderId String
+  type           ServiceOrderEventType
+  description    String
+  metadata       Json?
+  createdById    String?
+  createdAt      DateTime              @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, serviceOrderId, createdAt])
+}
+
+model ProductCategory {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?
+  version     Int      @default(1)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, deletedAt])
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  sku           String
+  description   String?
+  category      String   @default("")
+  categoryId    String?
+  location      String   @default("")
+  stockQuantity Int      @default(0)
+  minStock      Int      @default(0)
+  cost          Decimal  @default(0) @db.Decimal(14, 2)
+  price         Decimal  @db.Decimal(14, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?
+  version       Int      @default(1)
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryRelation  ProductCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  items             ServiceOrderItem[]
+  stockMovements    StockMovement[]
+  materialRequests  MaterialRequest[]
+  stockReservations StockReservation[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, deletedAt])
+}
+
+model StockMovement {
+  id             String       @id @default(cuid())
+  tenantId       String
+  productId      String
+  type           MovementType
+  quantity       Int
+  reason         String?
+  serviceOrderId String?
+  reservationId  String?
+  userId         String?
+  createdAt      DateTime     @default(now())
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  serviceOrder  ServiceOrder?     @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  reservation   StockReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, productId, createdAt])
+  @@index([tenantId, serviceOrderId, createdAt])
+}
+
+model StockReservation {
+  id               String                 @id @default(cuid())
+  tenantId         String
+  productId        String
+  serviceOrderId   String?
+  materialRequestId String?
+  quantity         Int
+  consumedQuantity Int                    @default(0)
+  status           StockReservationStatus @default(RESERVED)
+  expiresAt        DateTime?
+  createdById      String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  deletedAt        DateTime?
+  deletedBy        String?
+  version          Int                    @default(1)
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product         Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  serviceOrder    ServiceOrder?  @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  materialRequest MaterialRequest? @relation(fields: [materialRequestId], references: [id], onDelete: SetNull)
+  stockMovements  StockMovement[]
+
+  @@index([tenantId, productId, status])
+  @@index([tenantId, serviceOrderId, status])
+  @@index([tenantId, materialRequestId, status])
+}
+
+model MaterialRequest {
+  id             String        @id @default(cuid())
+  tenantId       String
+  serviceOrderId String
+  productId      String
+  quantity       Int
+  status         RequestStatus @default(PENDING)
+  requestedBy    String?
+  reviewedBy     String?
+  reviewNote     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  version        Int           @default(1)
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder      ServiceOrder       @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockReservations StockReservation[]
+
+  @@index([tenantId, serviceOrderId, status])
+  @@index([tenantId, productId, status])
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  tenantId       String
+  serviceOrderId String?
+  clientId       String
+  invoiceNumber  String?
+  status         InvoiceStatus @default(DRAFT)
+  issueDate      DateTime      @default(now())
+  dueDate        DateTime
+  subtotal       Decimal       @default(0) @db.Decimal(14, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(14, 2)
+  interestAmount Decimal       @default(0) @db.Decimal(14, 2)
+  penaltyAmount  Decimal       @default(0) @db.Decimal(14, 2)
+  totalAmount    Decimal       @default(0) @db.Decimal(14, 2)
+  balanceAmount  Decimal       @default(0) @db.Decimal(14, 2)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  version        Int           @default(1)
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder       ServiceOrder?       @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  payments           Payment[]
+  financialMovements FinancialMovement[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  tenantId           String
+  serviceOrderId     String?
+  invoiceId          String?
+  clientId           String
+  amount             Decimal       @db.Decimal(14, 2)
+  dueDate            DateTime
+  paidAt             DateTime?
+  status             PaymentStatus @default(PENDING)
+  method             PaymentMethod?
+  installments       Int           @default(1)
+  discountAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  interestAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  penaltyAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  cancellationReason String?
+  cancelledAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
+  deletedBy          String?
+  version            Int           @default(1)
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder       ServiceOrder?       @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  invoice            Invoice?            @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  financialMovements FinancialMovement[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, clientId, status])
+}
+
+model FinancialMovement {
+  id             String                  @id @default(cuid())
+  tenantId       String
+  serviceOrderId String?
+  invoiceId      String?
+  paymentId      String?
+  type           FinancialMovementType
+  status         FinancialMovementStatus @default(POSTED)
+  amount         Decimal                 @db.Decimal(14, 2)
+  description    String
+  occurredAt     DateTime                @default(now())
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+  version        Int                     @default(1)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  payment      Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, type, status])
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum RoleCode {
+  ADMIN
+  SUPERVISOR
+  STOCK
+  TECHNICIAN
+  ATTENDANT
+  FINANCIAL
+}
+
+enum TeamStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ChipStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
 }
 
 enum Priority {
@@ -175,108 +764,119 @@ enum Status {
   CANCELLED
 }
 
-model OSItem {
-  id             String       @id @default(cuid())
-  serviceOrderId String
-  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
-  productId      String?
-  product        Product?     @relation(fields: [productId], references: [id])
-  description    String
-  quantity       Int          @default(1)
-  unitPrice      Decimal      @db.Decimal(10, 2)
-  itemType       ItemType     @default(SERVICE)
-  createdAt      DateTime     @default(now())
-}
-
 enum ItemType {
   PRODUCT
   SERVICE
 }
 
-model Product {
-  id            String   @id @default(cuid())
-  name          String
-  sku           String   @unique
-  description   String?
-  category      String   @default("")
-  location      String   @default("")
-  stockQuantity Int      @default(0)
-  minStock      Int      @default(0)
-  cost          Decimal  @default(0) @db.Decimal(10, 2)
-  price         Decimal  @db.Decimal(10, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  items            OSItem[]
-  stockMovements   StockMovement[]
-  materialRequests MaterialRequest[]
-}
-
-model StockMovement {
-  id             String       @id @default(cuid())
-  productId      String
-  product        Product      @relation(fields: [productId], references: [id])
-  type           MovementType
-  quantity       Int
-  reason         String?
-  serviceOrderId String?
-  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
-  userId         String?
-  createdAt      DateTime     @default(now())
-}
-
 enum MovementType {
   IN
   OUT
+  TRANSFER
   ADJUSTMENT
-}
-
-model MaterialRequest {
-  id             String          @id @default(cuid())
-  serviceOrderId String
-  serviceOrder   ServiceOrder    @relation(fields: [serviceOrderId], references: [id])
-  productId      String
-  product        Product         @relation(fields: [productId], references: [id])
-  quantity       Int
-  status         RequestStatus   @default(PENDING)
-  requestedBy    String?
-  reviewedBy     String?
-  reviewNote     String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  LOSS
+  RETURN
 }
 
 enum RequestStatus {
   PENDING
   APPROVED
   REJECTED
+  CANCELLED
+  FULFILLED
 }
 
-model Payment {
-  id             String        @id @default(cuid())
-  serviceOrderId String
-  serviceOrder   ServiceOrder  @relation(fields: [serviceOrderId], references: [id])
-  clientId       String
-  client         Client        @relation(fields: [clientId], references: [id])
-  amount         Decimal       @db.Decimal(10, 2)
-  dueDate        DateTime
-  paidAt         DateTime?
-  status         PaymentStatus @default(PENDING)
-  createdAt      DateTime      @default(now())
+enum StockReservationStatus {
+  RESERVED
+  RELEASED
+  CONSUMED
+  CANCELLED
 }
 
 enum PaymentStatus {
   PENDING
+  PARTIALLY_PAID
+  PAID
+  CONFIRMED
+  OVERDUE
+  CANCELLED
+  REFUNDED
+  FAILED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_PAID
   PAID
   OVERDUE
   CANCELLED
+  VOID
 }
 
-enum Role {
-  ADMIN
-  SUPERVISOR
-  STOCK
-  TECHNICIAN
-  ATTENDANT
-  FINANCIAL
+enum PaymentMethod {
+  PIX
+  CASH
+  CARD
+  BOLETO
+  TRANSFER
+}
+
+enum FinancialMovementType {
+  CREDIT
+  DEBIT
+  REFUND
+  REVERSAL
+  ADJUSTMENT
+}
+
+enum FinancialMovementStatus {
+  PENDING
+  POSTED
+  CANCELLED
+}
+
+enum AttachmentEntityType {
+  SERVICE_ORDER
+  SERVICE_ORDER_EXECUTION
+  CLIENT
+  PRODUCT
+  CHIP
+  GENERIC
+}
+
+enum AttachmentKind {
+  PHOTO
+  SIGNATURE
+  PDF
+  DOCUMENT
+}
+
+enum ServiceOrderEventType {
+  CREATED
+  SCHEDULED
+  ASSIGNED
+  CHECKIN
+  CHECKOUT
+  STATUS_CHANGED
+  ATTACHMENT_ADDED
+  MATERIAL_REQUESTED
+  MATERIAL_RESERVED
+  PAYMENT_CREATED
+  PAYMENT_CONFIRMED
+  CANCELLED
+  COMPLETED
+  NOTE
+}
+
+enum AuditAction {
+  INSERT
+  UPDATE
+  DELETE
+  SOFT_DELETE
+  LOGIN
+  LOGOUT
+  PERMISSION_CHANGE
+  PASSWORD_RESET
+  TOKEN_REFRESH
 }

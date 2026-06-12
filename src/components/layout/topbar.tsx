@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogIn, LogOut, Plus, Search } from "lucide-react";
+import { Bell, LogIn, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { roleViewCopy } from "@/lib/access";
 import { useAppStore } from "@/store/use-app-store";
