@@ -1,0 +1,174 @@
+groups:
+  - name: controle-os-api
+    rules:
+      # Regra 9: taxa de erro 5xx acima de 5% por 5 min.
+      - alert: AltaTaxaDeErro5xx
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taxa de erro 5xx acima de 5%"
+          description: "{{ $value | humanizePercentage }} das requisições retornaram 5xx nos últimos 5 minutos."
+
+      # Latência p95 acima de 1s por 10 min.
+      - alert: AltaLatenciaP95
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência p95 acima de 1s"
+          description: "p95 das requisições está em {{ $value }}s."
+
+      # Dependência (DB ou Redis) indisponível.
+      - alert: DependenciaIndisponivel
+        expr: dependency_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dependência {{ $labels.dependency }} indisponível"
+          description: "{{ $labels.dependency }} está reportando down há mais de 1 minuto."
+
+      # Uso de heap acima de 90% por 10 min.
+      - alert: MemoriaAlta
+        expr: |
+          app_nodejs_heap_size_used_bytes / app_nodejs_heap_size_total_bytes > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de heap acima de 90%"
+          description: "Heap em {{ $value | humanizePercentage }} de uso."
+
+      # Event loop travando (operação síncrona bloqueante).
+      - alert: EventLoopLagAlto
+        expr: app_nodejs_eventloop_lag_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Event loop lag alto"
+          description: "Lag do event loop em {{ $value }}s."
+
+      # API fora do ar (scrape falhando).
+      - alert: ApiForaDoAr
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API não responde ao scrape"
+          description: "Prometheus não coleta /metrics do backend há mais de 1 minuto."
+
+      # Jobs da fila falhando de forma contínua.
+      - alert: FilaComFalhas
+        expr: sum(rate(queue_jobs_total{result="failed"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Jobs da fila falhando"
+          description: "Há jobs da fila os-events falhando continuamente."
+
+  - name: infra
+    rules:
+      # Postgres fora do ar.
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL indisponível"
+          description: "O exportador postgres não coleta dados há mais de 1 minuto."
+
+      # Redis fora do ar.
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis indisponível"
+          description: "O exportador redis não coleta dados há mais de 1 minuto."
+
+      # Disco do host acima de 85%.
+      - alert: DiscoQuaseCheio
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/rootfs"} / node_filesystem_size_bytes{mountpoint="/rootfs"})) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disco acima de 85% de uso"
+          description: "{{ $value | humanizePercentage }} do disco usado em /rootfs."
+
+      # Disco crítico — acima de 95%.
+      - alert: DiscoCritico
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/rootfs"} / node_filesystem_size_bytes{mountpoint="/rootfs"})) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disco acima de 95% — ação imediata necessária"
+          description: "{{ $value | humanizePercentage }} do disco usado. Risco de indisponibilidade total."
+
+      # CPU alta (média de 5 min acima de 85%).
+      - alert: CpuAltaSustentada
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU acima de 85% por mais de 10 minutos"
+          description: "Instância {{ $labels.instance }}: {{ $value | humanize }}% de CPU."
+
+      # Memória do host acima de 90%.
+      - alert: MemoriaHostAlta
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) /
+          node_memory_MemTotal_bytes > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memória do host acima de 90%"
+          description: "Uso: {{ $value | humanizePercentage }}. Verifique swap e processos."
+
+      # Backup — container parado ou sem jobs bem-sucedidos nas últimas 25h.
+      - alert: BackupContainerParado
+        expr: absent(up{job="backup"})
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container de backup não encontrado"
+          description: "O serviço de backup não está sendo monitorado. Verifique o docker-compose."
+
+      # Muitas conexões do Postgres (possível leak).
+      - alert: PostgresConexoesAltas
+        expr: |
+          sum(pg_stat_database_numbackends{datname!~"template.*|postgres"}) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL com muitas conexões: {{ $value }}"
+          description: "Possível connection leak. Verifique o pool do Prisma."
+
+      # Redis memória acima de 80% do maxmemory configurado.
+      - alert: RedisMemoriaAlta
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis usando mais de 80% da memória máxima"
+          description: "{{ $value | humanizePercentage }} de memória em uso. Reveja TTLs e políticas de eviction."
