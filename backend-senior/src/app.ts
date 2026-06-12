@@ -23,13 +23,28 @@ import aiRoutes from './routes/aiRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
+import { config } from './lib/config';
 import { metricsText, metricsContentType } from './lib/metrics';
 import { healthReport, livenessReport } from './lib/health';
 import { registerObservability, logRequestError } from './plugins/observability';
 import { redis } from './lib/cache';
 
+// Decodifica payload JWT sem verificar assinatura — apenas para identificar o tenant no rate limit.
+// A verificação real ocorre no middleware authenticate().
+function rateLimitKey(req: FastifyRequest): string {
+  const auth = (req.headers.authorization as string | undefined) ?? '';
+  if (auth.startsWith('Bearer ')) {
+    try {
+      const [, b64] = auth.slice(7).split('.');
+      const payload = JSON.parse(Buffer.from(b64, 'base64url').toString()) as Record<string, unknown>;
+      if (typeof payload.companyId === 'string') return `c:${payload.companyId}`;
+    } catch { /* não autenticado ou token malformado — cai no IP */ }
+  }
+  return `ip:${req.ip}`;
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = config.isProd;
 
   const app = Fastify({
     // Cast para o tipo base do Fastify: mantém uma única instância pino compartilhada
@@ -45,6 +60,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   registerObservability(app);
+
+  // Timeout global de requisições — protege workers contra requests pendurados
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.url?.startsWith('/health') || req.url?.startsWith('/metrics')) return;
+    const timer = setTimeout(() => {
+      if (!reply.sent) {
+        logger.warn({ event: 'request_timeout', reqId: req.id, url: req.url }, 'Timeout de requisição');
+        reply.status(503).send({ error: 'Tempo de resposta esgotado', code: 'TIMEOUT', reqId: req.id });
+      }
+    }, config.requestTimeoutMs);
+    reply.raw.on('finish', () => clearTimeout(timer));
+    reply.raw.on('close',  () => clearTimeout(timer));
+  });
 
   // Regras 2 + 3: todo erro vira log estruturado com stack trace completo.
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
@@ -92,28 +120,26 @@ export async function buildApp(): Promise<FastifyInstance> {
       : {}),
   });
 
+  // Rate limit por empresa (companyId do JWT) — garante isolamento de cota entre tenants.
+  // Requisições sem JWT (login, public) são limitadas por IP.
   await app.register(rateLimit, {
-    max: 100,
+    max: config.rateLimitMax,
     timeWindow: '1 minute',
-    allowList: [],
-    keyGenerator: (req) => req.ip,
+    keyGenerator: rateLimitKey,
+    errorResponseBuilder: (_req, ctx) => ({
+      error: 'Muitas requisições. Tente novamente em breve.',
+      code: 'RATE_LIMIT',
+      retryAfter: ctx.after,
+    }),
     ...(isProd && redis ? { redis, nameSpace: 'rl:' } : {}),
   });
 
-  const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret && isProd) {
-    throw new Error('JWT_SECRET não definido. Configure a variável de ambiente antes de iniciar em produção.');
-  }
-
-  const issuer = process.env.JWT_ISSUER || 'controle-os-api';
-  const audience = process.env.JWT_AUDIENCE || 'controle-os-client';
-
   await app.register(jwt, {
-    secret: jwtSecret ?? 'test-secret-only-for-tests',
+    secret: config.jwtSecret,
     sign: {
-      expiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
-      iss: issuer,
-      aud: audience,
+      expiresIn: config.jwtExpiresIn,
+      iss: config.jwtIssuer,
+      aud: config.jwtAudience,
     },
   });
 
@@ -126,13 +152,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Regra 7: endpoint de métricas no formato Prometheus.
   // Aceita token via: header x-metrics-token (nginx) OU Authorization: Bearer <token> (Prometheus).
-  const metricsToken = process.env.METRICS_TOKEN;
   app.get('/metrics', { config: { rateLimit: false } }, async (req, reply) => {
-    if (metricsToken) {
+    if (config.metricsToken) {
       const customHeader = (req.headers['x-metrics-token'] as string) ?? '';
       const authHeader   = (req.headers['authorization'] as string) ?? '';
       const bearerToken  = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-      if (customHeader !== metricsToken && bearerToken !== metricsToken) {
+      if (customHeader !== config.metricsToken && bearerToken !== config.metricsToken) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
     } else if (isProd) {

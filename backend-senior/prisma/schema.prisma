@@ -190,10 +190,15 @@ model Client {
   serviceOrders ServiceOrder[]
   chips         Chip[]
   invoices      Invoice[]
+  payments      Payment[]
 
   @@unique([companyId, document])
   @@index([companyId])
   @@index([document])
+  @@index([name])
+  @@index([phone])
+  @@index([city])
+  @@index([isBlocked])
 }
 
 // ─── PRODUCT & STOCK ─────────────────────────────────────────────────────────
@@ -238,6 +243,8 @@ model Product {
   @@unique([companyId, sku])
   @@index([companyId, categoryId])
   @@index([sku])
+  @@index([name])
+  @@index([minStock])
 }
 
 // StockMovement é a fonte de verdade do estoque.
@@ -261,6 +268,8 @@ model StockMovement {
   @@index([companyId, productId])
   @@index([productId, createdAt])
   @@index([serviceOrderId])
+  @@index([userId])
+  @@index([type, createdAt])
 }
 
 enum MovementType {
@@ -343,6 +352,8 @@ model Chip {
   @@unique([companyId, iccid])
   @@index([companyId, clientId])
   @@index([companyId, status])
+  @@index([serviceOrderId])
+  @@index([installedAt])
 }
 
 enum ChipStatus {
@@ -398,6 +409,9 @@ model ServiceOrder {
   deletedAt          DateTime?
   deletedBy          String?
 
+  scheduledStart     DateTime?
+  scheduledEnd       DateTime?
+
   items             ServiceOrderItem[]
   schedule          ServiceOrderSchedule?
   execution         ServiceOrderExecution?
@@ -416,6 +430,10 @@ model ServiceOrder {
   @@index([companyId, technicianId, status])
   @@index([companyId, teamId, status])
   @@index([companyId, priority, openingDate])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@index([scheduledStart])
+  @@index([scheduledEnd])
 }
 
 enum OrderStatus {
@@ -533,9 +551,13 @@ model Attachment {
   hash            String?
   uploadedBy      String?
   createdAt       DateTime @default(now())
+  deletedAt       DateTime?
+  deletedBy       String?
 
   @@index([entityType, entityId])
   @@index([companyId])
+  @@index([uploadedBy])
+  @@index([createdAt])
 }
 
 // ─── FINANCIAL ───────────────────────────────────────────────────────────────
@@ -596,6 +618,8 @@ model Payment {
   status         PaymentStatus @default(PENDING)
   installmentOf  Int?
   installmentNum Int?
+  reference      String?
+  description    String?
   cancelledAt    DateTime?
   cancelledBy    String?
   cancelReason   String?
@@ -609,6 +633,9 @@ model Payment {
   @@index([companyId, status, dueDate])
   @@index([companyId, clientId])
   @@index([invoiceId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([paidAt])
 }
 
 enum PaymentMethod {
@@ -655,6 +682,7 @@ enum FinancialMovementType {
   EXPENSE
   REFUND
   ADJUSTMENT
+  REVERSAL
 }
 
 // ─── AUDIT ────────────────────────────────────────────────────────────────────
@@ -680,5 +708,6 @@ model AuditLog {
   @@index([companyId, createdAt])
   @@index([entity, entityId])
   @@index([userId])
+  @@index([action])
   @@index([createdAt])
 }

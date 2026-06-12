@@ -1,8 +1,12 @@
 import 'dotenv/config';
+import { validateEnv } from './lib/config';
 import { buildApp } from './app';
 import { prisma } from './lib/prisma';
 import { redis } from './lib/cache';
 import { logger } from './lib/logger';
+
+// Valida variáveis obrigatórias antes de qualquer inicialização
+validateEnv();
 
 async function main() {
   const app = await buildApp();

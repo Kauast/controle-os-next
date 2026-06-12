@@ -35,6 +35,8 @@ export const createServiceOrderSchema = z.object({
       }),
     )
     .default([]),
+  scheduledStart: z.string().datetime().optional(),
+  scheduledEnd: z.string().datetime().optional(),
   schedule: z
     .object({
       scheduledDate: z.string().datetime(),
@@ -43,7 +45,15 @@ export const createServiceOrderSchema = z.object({
       notes: z.string().optional(),
     })
     .optional(),
-});
+}).refine(
+  (data) => {
+    if (data.scheduledStart && data.scheduledEnd) {
+      return new Date(data.scheduledEnd) > new Date(data.scheduledStart);
+    }
+    return true;
+  },
+  { message: 'scheduledEnd deve ser posterior a scheduledStart', path: ['scheduledEnd'] },
+);
 
 export const updateStatusSchema = z.object({
   status: z.nativeEnum(OrderStatus),

@@ -8,7 +8,9 @@ const SOFT_DELETE_MODELS = new Set([
 
 function buildPrismaClient() {
   const base = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    log: process.env.NODE_ENV === 'development'
+      ? ['query', 'warn', 'error']
+      : ['error'],
   });
 
   return base.$extends({
@@ -67,9 +69,23 @@ function buildPrismaClient() {
   });
 }
 
-// Exporta com tipo inferido para que extensões sejam visíveis nos módulos
-export const prisma = buildPrismaClient();
 export type ExtendedPrismaClient = ReturnType<typeof buildPrismaClient>;
+
+// Singleton: evita múltiplas conexões em hot-reload (tsx watch / Next.js HMR)
+const globalForPrisma = globalThis as unknown as {
+  prisma?: ExtendedPrismaClient;
+};
+
+export const prisma = globalForPrisma.prisma ?? buildPrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
+
+// Graceful shutdown — libera conexões ao encerrar o processo
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
 
 // Expõe Prisma para uso de TransactionClient em serviços
 export { Prisma };

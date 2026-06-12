@@ -86,6 +86,8 @@ export class ServiceOrderService {
           priority: (data.priority as Priority) ?? 'NORMAL',
           chipIccid: data.chipIccid,
           createdById: user.id,
+          scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : undefined,
+          scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : undefined,
           items: items.length > 0 ? { create: items } : undefined,
         },
         include: { client: true, technician: true, team: true, items: true },
