@@ -5,11 +5,13 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Smartphone } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Metrics } from "@/components/dashboard/metrics";
 import { AgendaPanel } from "@/components/dashboard/agenda-panel";
 import { DispatchBoard } from "@/components/dashboard/dispatch-board";
 import { OrderQueue } from "@/components/dashboard/order-queue";
+import { OsKanban } from "@/components/os/os-kanban";
 import { StockPanel } from "@/components/stock/stock-panel";
 import { ReportsPanel } from "@/components/reports/reports-panel";
 import { FinancePanel } from "@/components/finance/finance-panel";
@@ -30,7 +32,7 @@ function SectionView({ section }: { section: SectionKey }) {
   switch (section) {
     case "painel":
       return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           <Metrics />
           <DispatchBoard />
           <OrderQueue />
@@ -38,13 +40,13 @@ function SectionView({ section }: { section: SectionKey }) {
       );
     case "agenda":
       return (
-        <div className="flex flex-col gap-4">
-          <AgendaPanel />
+        <div className="flex flex-col gap-5">
           <DispatchBoard />
+          <AgendaPanel />
         </div>
       );
     case "ordens":
-      return <OrderQueue />;
+      return <OsKanban />;
     case "estoque":
       return <StockPanel />;
     case "clientes":
@@ -63,9 +65,9 @@ function SectionView({ section }: { section: SectionKey }) {
       return <ReportsPanel />;
     case "auditoria":
       return (
-        <div className="rounded-2xl border border-white/10 bg-[#101010] p-6">
-          <h2 className="text-lg font-bold text-white">Auditoria</h2>
-          <p className="mt-2 text-sm text-zinc-400">Log de acoes do sistema. Em breve.</p>
+        <div className="rounded-[16px] border border-line bg-panel p-6">
+          <h2 className="text-lg font-bold text-ink">Auditoria</h2>
+          <p className="mt-2 text-sm text-muted">Log de ações do sistema. Em breve.</p>
         </div>
       );
     default:
@@ -86,8 +88,11 @@ export default function Home() {
 
   if (!hydrated) {
     return (
-      <div className="grid min-h-screen place-items-center bg-black text-zinc-400">
-        Carregando...
+      <div className="grid min-h-screen place-items-center bg-dark text-muted">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+          <p className="text-sm">Carregando...</p>
+        </div>
       </div>
     );
   }
@@ -95,19 +100,23 @@ export default function Home() {
   const current = canAccessSection(section, role) ? section : defaultSection(role);
 
   return (
-    <div className="relative flex min-h-screen bg-black text-zinc-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.04),transparent_25%)]" />
+    <div className="relative flex min-h-screen bg-dark text-ink">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_right,rgba(20,184,166,0.04),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(20,184,166,0.02),transparent_30%)]" />
+
       <Sidebar />
+      <MobileSidebar />
+
       <main className="relative flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <div className="flex-1 overflow-y-auto p-4 pb-24 lg:p-7 lg:pb-7">
+
+        <div className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={current}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
             >
               <SectionView section={current} />
             </motion.div>
@@ -116,7 +125,7 @@ export default function Home() {
 
         <Link
           href="/tecnico"
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-zinc-100 lg:hidden"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-xl bg-panel px-4 py-3 text-sm font-semibold text-ink shadow-lg border border-line transition hover:bg-panel-soft lg:hidden"
         >
           <Smartphone className="size-4" /> App do técnico
         </Link>
