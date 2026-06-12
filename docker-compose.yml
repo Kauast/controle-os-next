@@ -13,6 +13,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_READ_SEARCH
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app
 
@@ -32,6 +46,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app
 
@@ -58,6 +81,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
       METRICS_TOKEN: ${METRICS_TOKEN}
+      # Senhas de seed — disponíveis para execução manual: docker compose exec backend npm run seed
       SEED_DEFAULT_PASS: ${SEED_DEFAULT_PASS}
       SEED_ADMIN_PASS: ${SEED_ADMIN_PASS}
       SEED_STOCK_PASS: ${SEED_STOCK_PASS}
@@ -71,6 +95,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # seed REMOVIDO do comando automático de produção
+    # para seed manual: docker compose exec backend npm run seed
     command: >
       sh -c "npx prisma migrate deploy && npm run start"
     healthcheck:
@@ -79,6 +105,13 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     networks:
       - app
 
@@ -91,6 +124,7 @@ services:
       BACKEND_URL: http://backend:3333
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
+    # service_healthy garante que o backend está respondendo antes de subir o frontend
     depends_on:
       backend:
         condition: service_healthy
@@ -100,6 +134,13 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     networks:
       - app
 
@@ -109,6 +150,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # Grafana e Uptime Kuma expostos em portas dedicadas via SSL no nginx.
+      # TODO: adicionar allowlist de IP no firewall do host para 3001 e 3200
       - "3001:3001"
       - "3200:3200"
     environment:
@@ -125,6 +168,20 @@ services:
     depends_on:
       frontend:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     networks:
       - app
 
@@ -133,23 +190,39 @@ services:
     restart: unless-stopped
     volumes:
       - uptime_kuma_data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app
 
   prometheus:
     image: prom/prometheus:v2.51.2
     restart: unless-stopped
+    # entrypoint substitui METRICS_TOKEN_PLACEHOLDER antes de iniciar
+    entrypoint: ["/bin/sh", "/etc/prometheus/prometheus-entrypoint.sh"]
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN}
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus-entrypoint.sh:/etc/prometheus/prometheus-entrypoint.sh:ro
       - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=30d
-      - --web.enable-lifecycle
     depends_on:
       - alertmanager
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app
 
@@ -162,6 +235,15 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app
 
@@ -177,6 +259,15 @@ services:
       - --path.procfs=/host/proc
       - --path.sysfs=/host/sys
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
     networks:
       - app
 
@@ -188,6 +279,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
     networks:
       - app
 
@@ -198,7 +298,17 @@ services:
       REDIS_ADDR: redis://redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
     networks:
       - app
 
@@ -211,11 +321,20 @@ services:
       GF_SERVER_ROOT_URL: https://${DOMAIN}:3200
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_LOG_LEVEL: warn
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app
 
@@ -233,6 +352,11 @@ services:
           sleep 12h & wait $${!};
         done
       "
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   backup:
     image: prodrigestivill/postgres-backup-local:16
@@ -252,6 +376,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
     networks:
       - app
 

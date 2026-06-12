@@ -1,147 +1,275 @@
 # Controle OS, Estoque e Agenda
 
-Sistema de **ordens de serviço, estoque com QR Code, agenda por equipes e app do técnico** com backend real, autenticação JWT e banco de dados PostgreSQL.
+Sistema de **ordens de serviço, estoque com QR Code, agenda por equipes e app do técnico** com backend real, autenticação JWT em cookie httpOnly e banco PostgreSQL.
 
 ## Stack
 
-### Frontend
-- **Next.js 15** (App Router) + **TypeScript**
-- **Tailwind CSS v4**
-- **shadcn/ui** (componentes em `src/components/ui`)
-- **TanStack Query v5** (React Query — estado do servidor)
-- **Zustand v5** (estado de UI e fluxos locais)
-- **React Hook Form** + **Zod** (formulários e validação)
-- **Framer Motion** (animações, sidebar mobile)
-- **lucide-react** (ícones)
-
-### Backend
-- **Fastify 5** + **TypeScript**
-- **Prisma ORM** + **PostgreSQL**
-- **Redis** (rate limiting)
-- **JWT** em cookie httpOnly (8h)
-- **Docker Compose** (4 serviços: postgres, redis, backend, frontend)
+| Camada | Tecnologias |
+|--------|-------------|
+| **Frontend** | Next.js 15 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui |
+| **Estado** | TanStack Query v5, Zustand v5 |
+| **Formulários** | React Hook Form + Zod |
+| **Backend** | Fastify 5, Prisma ORM, PostgreSQL 16, Redis 7 |
+| **Auth** | JWT em cookie httpOnly/Secure/SameSite=Strict (8h), refresh token (7d) |
+| **Infra** | Docker Compose, Nginx (SSL/TLS), Certbot (Let's Encrypt) |
+| **Observabilidade** | Prometheus, Grafana, Alertmanager, Uptime Kuma, Node Exporter |
+| **Backup** | postgres-backup-local (diário, 7 dias + 4 semanas + 3 meses) |
 
 ## Funcionalidades
 
 - 5 perfis com controle de acesso: `ADMIN`, `STOCK`, `TECHNICIAN`, `ATTENDANT`, `FINANCIAL`
-- Painel com indicadores em tempo real (dados do banco)
-- CRUD completo de **Clientes**, **Produtos** e **Técnicos** via API REST
-- Agenda das equipes com **drag & drop** de OS, calendário mensal e agendamento
-- **Estoque**: produtos, QR Code, entrada/saída, alertas de estoque baixo
-- **Relatórios por equipe** e **financeiro** (somente admin)
-- **Navegação mobile** com sidebar deslizante (menu hambúrguer)
-- **App do técnico** (`/tecnico`): check-in, 3 fotos, assinatura em canvas, ID do chip e finalização da OS
-- Rate limiting, CORS configurado e helmet no backend
+- Painel com KPIs em tempo real
+- CRUD completo de Clientes, Produtos e Técnicos
+- Agenda das equipes com drag & drop de OS
+- Estoque: QR Code, entrada/saída, alertas de estoque baixo
+- Relatórios por equipe e financeiro (somente admin)
+- App do técnico (`/tecnico`): check-in, fotos, assinatura canvas, finalização de OS
+- Rate limiting por IP com fallback Redis
 
-## Rodando localmente
+---
+
+## Setup local (desenvolvimento)
 
 ### Pré-requisitos
-- Docker e Docker Compose (para PostgreSQL e Redis)
+
 - Node.js 20+
+- Docker e Docker Compose
 
-### Variáveis de ambiente
-
-Copie `.env.example` para `.env` na raiz e preencha os valores. Para desenvolvimento local, os valores padrão já funcionam.
-
-**`.env.local`** (raiz — Next.js):
-```
-BACKEND_URL=http://localhost:3333
-JWT_SECRET=controle-os-jwt-secret-mude-em-producao
-```
-
-**`backend-senior/.env`**:
-```
-DATABASE_URL="postgresql://postgres:password@localhost:5432/controle_os"
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=controle-os-jwt-secret-mude-em-producao
-PORT=3333
-NODE_ENV=development
-ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_PASS=admin123
-SEED_STOCK_PASS=estoque123
-SEED_TECH_PASS=tecnico123
-SEED_ATTENDANT_PASS=atend123
-SEED_FINANCIAL_PASS=financeiro123
-```
-
-### Subindo os serviços
+### 1. Variáveis de ambiente
 
 ```bash
-# 1. Banco e cache
-docker-compose up -d postgres redis
+# Raiz (Next.js)
+cp .env.example .env.local
+# Edite .env.local e defina no mínimo:
+# BACKEND_URL=http://localhost:3333
+# JWT_SECRET=qualquer-valor-para-dev
 
-# 2. Backend
+# Backend
+cp backend-senior/.env.example backend-senior/.env
+# Edite com DATABASE_URL, REDIS_URL e JWT_SECRET iguais ao .env.local
+```
+
+### 2. Subir serviços
+
+```bash
+# Terminal 1 — Banco e cache
+docker compose -f backend-senior/docker-compose.yml up -d
+
+# Terminal 2 — Backend
 cd backend-senior
 npm install
-npx prisma migrate deploy      # cria as tabelas
-npm run seed                   # cria usuários demo (uma vez)
+npx prisma migrate deploy
+npm run seed     # cria usuários demo (executar apenas 1 vez)
 npm run dev
 
-# 3. Frontend (outra aba)
+# Terminal 3 — Frontend
 cd ..
 npm install
 npm run dev
 ```
 
-Acesse [http://localhost:3000](http://localhost:3000).
+Acesse: [http://localhost:3000](http://localhost:3000)
 
-### Usuários demo
+### Usuários demo (desenvolvimento)
 
-| E-mail | Senha | Perfil |
-|---|---|---|
-| admin@controle.com | admin123 | Admin |
-| estoque@controle.com | estoque123 | Estoque |
-| tecnico@controle.com | tecnico123 | Técnico |
-| atendimento@controle.com | atend123 | Atendimento |
-| financeiro@controle.com | financeiro123 | Financeiro |
+| E-mail | Senha padrão | Perfil |
+|--------|--------------|--------|
+| admin@controle.com | definido em `SEED_ADMIN_PASS` | Admin |
+| estoque@controle.com | `SEED_STOCK_PASS` | Estoque |
+| tecnico@controle.com | `SEED_TECH_PASS` | Técnico |
+| atendimento@controle.com | `SEED_ATTENDANT_PASS` | Atendimento |
+| financeiro@controle.com | `SEED_FINANCIAL_PASS` | Financeiro |
 
-### Docker Compose (stack completa)
+---
+
+## Deploy em produção (VPS com Docker Compose)
+
+### Pré-requisitos
+
+- VPS Ubuntu 22+ com IP público
+- DNS do domínio apontando para a VPS
+- Acesso SSH root
+
+### 1. Clonar e configurar
 
 ```bash
-# Copie e preencha as variáveis antes de subir
+git clone https://github.com/Kauast/controle-os-next.git /opt/controle-os
+cd /opt/controle-os
 cp .env.example .env
-# Edite .env com senhas reais e SEED_*_PASS
-
-docker-compose up -d
-# O backend já roda migrate + seed automaticamente na inicialização
 ```
 
-### Deploy em produção
+### 2. Variáveis obrigatórias (`.env`)
 
-1. Copie `.env.example` para `.env` e gere senhas seguras:
-   ```bash
-   openssl rand -base64 32  # para POSTGRES_PASSWORD e REDIS_PASSWORD
-   openssl rand -base64 64  # para JWT_SECRET
-   ```
-2. Defina `ALLOWED_ORIGINS` com o domínio real do frontend.
-3. Defina `SEED_*_PASS` com as senhas que os usuários vão usar.
-4. Execute `docker-compose up -d`.
+```bash
+# Domínio
+DOMAIN=seu-dominio.com
 
-## Estrutura
+# PostgreSQL — use senhas fortes
+POSTGRES_USER=controle_os_user
+POSTGRES_PASSWORD=$(openssl rand -base64 32)
+POSTGRES_DB=controle_os
 
-```text
+# Redis
+REDIS_PASSWORD=$(openssl rand -base64 32)
+
+# JWT — mesmo valor no backend e frontend
+JWT_SECRET=$(openssl rand -base64 64)
+
+# Métricas (protege /metrics do backend)
+METRICS_TOKEN=$(openssl rand -base64 24)
+
+# Grafana
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)
+
+# Let's Encrypt
+CERTBOT_EMAIL=seu@email.com
+
+# Senhas dos usuários demo (para seed manual na primeira instalação)
+SEED_ADMIN_PASS=$(openssl rand -base64 16)
+SEED_STOCK_PASS=$(openssl rand -base64 16)
+SEED_TECH_PASS=$(openssl rand -base64 16)
+SEED_ATTENDANT_PASS=$(openssl rand -base64 16)
+SEED_FINANCIAL_PASS=$(openssl rand -base64 16)
+```
+
+### 3. Setup automático
+
+```bash
+sudo bash scripts/setup-vps.sh
+```
+
+O script instala Docker, configura firewall, faz build, emite certificado SSL e pergunta se deseja executar o seed.
+
+### 4. Seed manual (primeira instalação ou quando necessário)
+
+```bash
+# O seed é idempotente — pula usuários que já existem
+docker compose exec backend npm run seed
+
+# Ou use o helper:
+bash scripts/seed.sh
+```
+
+> **Atenção:** O seed nunca é executado automaticamente em produção. O comando de produção é apenas `prisma migrate deploy && npm run start`.
+
+### 5. SSL e renovação
+
+O Certbot renova automaticamente via cronjob interno. Para emitir manualmente:
+
+```bash
+bash scripts/setup-ssl.sh
+```
+
+### 6. Monitoramento
+
+| Serviço | URL |
+|---------|-----|
+| App | `https://DOMAIN` |
+| Uptime Kuma | `https://DOMAIN:3001` |
+| Grafana | `https://DOMAIN:3200` |
+
+> Para segurança adicional, restrinja as portas 3001 e 3200 por IP no firewall:
+> ```bash
+> ufw allow from SEU_IP to any port 3001
+> ufw allow from SEU_IP to any port 3200
+> ufw delete allow 3001/tcp
+> ufw delete allow 3200/tcp
+> ```
+
+### 7. Backup e restore
+
+**Backup automático** — diário às 00:00, retendo:
+- 7 dias
+- 4 semanas
+- 3 meses
+
+Backups em: `./backups/`
+
+**Backup manual imediato:**
+```bash
+bash scripts/backup-now.sh
+```
+
+**Restore:**
+```bash
+# Lista backups disponíveis
+ls -lh backups/*.sql.gz
+
+# Restaura (confirma antes de sobrescrever)
+bash scripts/restore.sh backups/ARQUIVO.sql.gz
+```
+
+---
+
+## CI/CD (GitHub Actions)
+
+O workflow em `.github/workflows/ci.yml` executa em todo push/PR:
+
+1. **Backend** — typecheck + testes (Vitest)
+2. **Frontend** — typecheck + build (Next.js)
+3. **Docker** — build das imagens + validação do `docker-compose.yml`
+4. **Security** — verifica se `.env` está sendo rastreado pelo git
+
+O deploy para VPS está em `.github/workflows/deploy.yml` (precisa dos secrets abaixo).
+
+### Secrets necessários no GitHub
+
+| Secret | Descrição |
+|--------|-----------|
+| `VPS_HOST` | IP ou hostname da VPS |
+| `VPS_USER` | Usuário SSH (ex.: `deploy`) |
+| `VPS_SSH_KEY` | Chave privada SSH |
+| `VPS_SSH_PORT` | Porta SSH (padrão: 22) |
+
+---
+
+## Estrutura do projeto
+
+```
 controle-os-next/
-  src/
-    app/               # rotas Next.js (App Router) + API routes
-      api/
-        auth/          # login, logout, me
-        backend/       # proxy reverso → backend Fastify
-    components/
-      ui/              # shadcn/ui
-      layout/          # Sidebar (desktop + mobile), Topbar
-      dashboard/       # métricas, agenda, dispatch, fila de OS
-      stock/           # estoque e QR
-      reports/ finance/ tracking/ teams/ clients/ dialogs/
-      tecnico/         # canvas de assinatura
-    hooks/             # React Query: useProducts, useTechnicians, useClients, useServiceOrders
-    lib/               # tipos, utils, regras de acesso, api client
-    store/             # Zustand: use-app-store, use-ui-store
-  backend-senior/
-    src/
-      controllers/     # auth, client, product, technician, serviceOrder, report
-      routes/          # Fastify route registration
-      services/        # lógica de negócio + Prisma
-      lib/             # JWT, seed-users
-    prisma/
-      schema.prisma    # modelos: User, Client, Product, Technician, ServiceOrder
+├── src/                        # Frontend Next.js
+│   ├── app/
+│   │   ├── api/auth/           # BFF: login (cookie httpOnly), logout, me
+│   │   ├── api/backend/        # Proxy para Fastify
+│   │   └── login/, tecnico/, ...
+│   ├── components/             # UI por domínio
+│   ├── hooks/                  # TanStack Query hooks
+│   ├── lib/                    # tipos, utils, regras de acesso
+│   └── store/                  # Zustand stores
+├── backend-senior/             # API Fastify
+│   ├── src/
+│   │   ├── controllers/        # auth, client, product, serviceOrder, ...
+│   │   ├── routes/             # registro de rotas Fastify
+│   │   ├── services/           # lógica de negócio + Prisma
+│   │   ├── lib/                # prisma, cache, metrics, health, logger
+│   │   ├── middlewares/        # authenticate, authorize
+│   │   └── plugins/            # observability
+│   └── prisma/schema.prisma    # modelos do banco
+├── nginx/                      # Config Nginx + templates SSL/HTTP
+├── monitoring/                 # Prometheus, Alertmanager, alerts.yml, Grafana
+├── scripts/                    # deploy.sh, setup-vps.sh, backup, restore, seed
+├── backups/                    # Backups PostgreSQL (não commitados)
+├── docker-compose.yml          # Stack de produção completa
+└── Dockerfile                  # Imagem frontend Next.js (standalone)
 ```
+
+---
+
+## Checklist de produção
+
+- [ ] `.env` criado com senhas fortes (nunca commitar)
+- [ ] `DOMAIN` apontando para a VPS no DNS
+- [ ] `CERTBOT_EMAIL` válido para alertas de renovação SSL
+- [ ] `JWT_SECRET` com pelo menos 64 chars aleatórios
+- [ ] `METRICS_TOKEN` definido (protege `/metrics`)
+- [ ] `GRAFANA_ADMIN_PASSWORD` forte definido
+- [ ] Seed executado manualmente na primeira instalação
+- [ ] Firewall UFW ativo (portas 22, 80, 443, 3001, 3200)
+- [ ] Portas 3001 e 3200 restritas por IP se uso interno apenas
+- [ ] Backup testado: `bash scripts/backup-now.sh` + restore verificado
+- [ ] Grafana configurado com datasource Prometheus
+- [ ] Uptime Kuma com monitor do health endpoint
+- [ ] Alertmanager com webhook ou email configurado em `monitoring/alertmanager.yml`
+- [ ] Logs com rotação configurados (já no docker-compose.yml)
+- [ ] `docker compose ps` — todos os containers `Up (healthy)`

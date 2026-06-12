@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend — lint, typecheck, tests
+    name: Backend — typecheck, tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,7 +33,7 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
-          JWT_SECRET: ci-test-secret
+          JWT_SECRET: ci-test-secret-mínimo-32-chars-ok
 
   frontend:
     name: Frontend — typecheck, build
@@ -57,10 +57,11 @@ jobs:
         run: npm run build
         env:
           BACKEND_URL: http://localhost:3333
-          JWT_SECRET: ci-test-secret
+          JWT_SECRET: ci-test-secret-mínimo-32-chars-ok
+          NODE_ENV: production
 
   docker:
-    name: Docker build check
+    name: Docker build + compose validation
     runs-on: ubuntu-latest
     needs: [backend, frontend]
 
@@ -72,3 +73,34 @@ jobs:
 
       - name: Build frontend image
         run: docker build -t controle-os-frontend .
+
+      - name: Validate docker-compose config
+        run: |
+          cp .env.example .env
+          # Preenche placeholders obrigatórios para validação sintática
+          sed -i \
+            -e 's|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=ci_placeholder|' \
+            -e 's|REDIS_PASSWORD=.*|REDIS_PASSWORD=ci_placeholder|' \
+            -e 's|JWT_SECRET=.*|JWT_SECRET=ci-test-secret-mínimo-32-chars-ok|' \
+            -e 's|METRICS_TOKEN=.*|METRICS_TOKEN=ci_placeholder|' \
+            -e 's|GRAFANA_ADMIN_PASSWORD=.*|GRAFANA_ADMIN_PASSWORD=ci_placeholder|' \
+            -e 's|DOMAIN=.*|DOMAIN=example.com|' \
+            .env
+          docker compose config --quiet
+
+  security-env:
+    name: Verificar .env não commitado
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checar arquivos .env sensíveis
+        run: |
+          for f in .env backend-senior/.env; do
+            if git ls-files --error-unmatch "$f" 2>/dev/null; then
+              echo "::error::$f está sendo rastreado pelo git — remova com: git rm --cached $f"
+              exit 1
+            fi
+          done
+          echo "OK: nenhum .env sensível commitado."

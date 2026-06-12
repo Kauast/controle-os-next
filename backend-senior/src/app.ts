@@ -20,6 +20,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import userRoutes from './routes/userRoutes';
 import auditRoutes from './routes/auditRoutes';
 import aiRoutes from './routes/aiRoutes';
+import paymentRoutes from './routes/paymentRoutes';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
 import { metricsText, metricsContentType } from './lib/metrics';
@@ -124,12 +125,14 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // Regra 7: endpoint de métricas no formato Prometheus.
-  // Em produção, exige METRICS_TOKEN via header x-metrics-token.
+  // Aceita token via: header x-metrics-token (nginx) OU Authorization: Bearer <token> (Prometheus).
   const metricsToken = process.env.METRICS_TOKEN;
   app.get('/metrics', { config: { rateLimit: false } }, async (req, reply) => {
     if (metricsToken) {
-      const provided = (req.headers['x-metrics-token'] as string) ?? '';
-      if (provided !== metricsToken) {
+      const customHeader = (req.headers['x-metrics-token'] as string) ?? '';
+      const authHeader   = (req.headers['authorization'] as string) ?? '';
+      const bearerToken  = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+      if (customHeader !== metricsToken && bearerToken !== metricsToken) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
     } else if (isProd) {
@@ -160,6 +163,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(userRoutes, { prefix: '/api/users' });
   await app.register(auditRoutes, { prefix: '/api/audit' });
   await app.register(aiRoutes, { prefix: '/api/ai' });
+  await app.register(paymentRoutes, { prefix: '/api/payments' });
 
   return app;
 }
