@@ -3,14 +3,26 @@ import { logger } from './logger';
 import { cacheOperations } from './metrics';
 
 // Conexão Redis dedicada ao cache (separada da fila BullMQ).
+// lazyConnect: true — não aborta a inicialização se Redis estiver indisponível.
+// enableOfflineQueue: false — operações falham imediatamente em vez de acumular na memória.
 export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  maxRetriesPerRequest: 2,
-  lazyConnect: false,
-  enableOfflineQueue: true,
+  maxRetriesPerRequest: 1,
+  lazyConnect: true,
+  enableOfflineQueue: false,
+  retryStrategy: (times) => {
+    if (times > 5) return null; // desiste após 5 tentativas — evita loop infinito
+    return Math.min(times * 500, 3000); // backoff: 500ms, 1s, 1.5s, 2s, 2.5s, 3s
+  },
 });
 
 redis.on('error', (err) => {
   logger.error({ event: 'cache_error', err: err.message }, 'Erro na conexão de cache (Redis)');
+});
+redis.on('reconnecting', () => {
+  logger.warn({ event: 'cache_reconnecting' }, 'Redis reconectando');
+});
+redis.on('ready', () => {
+  logger.info({ event: 'cache_ready' }, 'Redis pronto');
 });
 
 const NAME = 'app';
