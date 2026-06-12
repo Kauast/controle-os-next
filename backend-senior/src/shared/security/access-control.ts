@@ -1,0 +1,62 @@
+import { RoleCode } from '@prisma/client';
+
+export const PERMISSIONS = {
+  USERS_MANAGE: 'users:manage',
+  CLIENTS_READ: 'clients:read',
+  CLIENTS_WRITE: 'clients:write',
+  PRODUCTS_READ: 'products:read',
+  PRODUCTS_WRITE: 'products:write',
+  STOCK_MANAGE: 'stock:manage',
+  SERVICE_ORDERS_READ: 'service-orders:read',
+  SERVICE_ORDERS_WRITE: 'service-orders:write',
+  SERVICE_ORDERS_ASSIGN: 'service-orders:assign',
+  SERVICE_ORDERS_EXECUTE: 'service-orders:execute',
+  PAYMENTS_MANAGE: 'payments:manage',
+  REPORTS_READ: 'reports:read',
+  AUDIT_READ: 'audit:read',
+  CHIPS_MANAGE: 'chips:manage',
+} as const;
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
+  ADMIN: Object.values(PERMISSIONS),
+  SUPERVISOR: [
+    PERMISSIONS.CLIENTS_READ,
+    PERMISSIONS.CLIENTS_WRITE,
+    PERMISSIONS.PRODUCTS_READ,
+    PERMISSIONS.SERVICE_ORDERS_READ,
+    PERMISSIONS.SERVICE_ORDERS_WRITE,
+    PERMISSIONS.SERVICE_ORDERS_ASSIGN,
+    PERMISSIONS.SERVICE_ORDERS_EXECUTE,
+    PERMISSIONS.REPORTS_READ,
+    PERMISSIONS.AUDIT_READ,
+    PERMISSIONS.CHIPS_MANAGE,
+  ],
+  STOCK: [
+    PERMISSIONS.PRODUCTS_READ,
+    PERMISSIONS.PRODUCTS_WRITE,
+    PERMISSIONS.STOCK_MANAGE,
+    PERMISSIONS.SERVICE_ORDERS_READ,
+  ],
+  TECHNICIAN: [
+    PERMISSIONS.SERVICE_ORDERS_READ,
+    PERMISSIONS.SERVICE_ORDERS_EXECUTE,
+    PERMISSIONS.CHIPS_MANAGE,
+  ],
+  ATTENDANT: [
+    PERMISSIONS.CLIENTS_READ,
+    PERMISSIONS.CLIENTS_WRITE,
+    PERMISSIONS.SERVICE_ORDERS_READ,
+    PERMISSIONS.SERVICE_ORDERS_WRITE,
+  ],
+  FINANCIAL: [
+    PERMISSIONS.CLIENTS_READ,
+    PERMISSIONS.PAYMENTS_MANAGE,
+    PERMISSIONS.REPORTS_READ,
+    PERMISSIONS.AUDIT_READ,
+  ],
+};
+
+export function hasAnyPermission(owned: string[], required: string[]) {
+  return required.some((permission) => owned.includes(permission));
+}
+

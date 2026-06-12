@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { AuditAction, RoleCode } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
@@ -7,119 +8,274 @@ import { sendEmail, buildPasswordResetEmail } from '../lib/email';
 import { audit } from '../lib/audit';
 
 export const registerSchema = z.object({
-  name: z.string().optional(),
+  name: z.string().min(2).optional(),
   email: z.string().email(),
-  password: z.string().min(8),
-  role: z.enum(['ADMIN', 'SUPERVISOR', 'STOCK', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL']).default('ATTENDANT'),
+  password: z.string().min(10),
+  role: z.nativeEnum(RoleCode).default(RoleCode.ATTENDANT),
 });
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string(),
+  password: z.string().min(1),
+  tenantSlug: z.string().min(1).optional(),
 });
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email(),
+  tenantSlug: z.string().min(1).optional(),
 });
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(1),
-  password: z.string().min(8, 'Senha deve ter no minimo 8 caracteres'),
+  password: z.string().min(10, 'Senha deve ter no mínimo 10 caracteres'),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
+const BASE_LOCK_MINUTES = 15;
 const MAX_ATTEMPTS = 5;
-const LOCK_MINUTES = 15;
 const REFRESH_TOKEN_TTL_DAYS = 7;
 
+function hashToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+async function resolveTenantId(tenantSlug?: string) {
+  const slug = tenantSlug ?? process.env.DEFAULT_TENANT_SLUG ?? 'default';
+  const tenant = await prisma.tenant.findUnique({ where: { slug } });
+  if (!tenant) {
+    throw new AppError(`Tenant '${slug}' não encontrado`, 404);
+  }
+  return tenant.id;
+}
+
+function lockMinutesForAttempt(attempts: number) {
+  if (attempts < MAX_ATTEMPTS) return 0;
+  const steps = attempts - MAX_ATTEMPTS;
+  return Math.min(BASE_LOCK_MINUTES * Math.pow(2, steps), 24 * 60);
+}
+
 export class AuthService {
-  async register(data: RegisterInput) {
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) throw new AppError('E-mail ja cadastrado', 409);
-    const hashed = await bcrypt.hash(data.password, 12);
-    const user = await prisma.user.create({
-      data: { name: data.name, email: data.email, password: hashed, role: data.role },
+  async register(data: RegisterInput, tenantId: string) {
+    const existing = await prisma.user.findFirst({
+      where: { tenantId, email: data.email, deletedAt: null },
     });
-    await audit({ userId: user.id, userEmail: user.email, action: 'USUARIO_CRIADO', detail: 'Perfil: ' + data.role });
-    return { id: user.id, name: user.name, email: user.email, role: user.role };
+    if (existing) throw new AppError('E-mail já cadastrado', 409);
+
+    const hashed = await bcrypt.hash(data.password, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        tenantId,
+        name: data.name,
+        email: data.email.toLowerCase(),
+        password: hashed,
+        role: data.role,
+      },
+    });
+
+    await audit({
+      tenantId,
+      userId: user.id,
+      userEmail: user.email,
+      entity: 'User',
+      entityId: user.id,
+      action: AuditAction.INSERT,
+      after: { email: user.email, role: user.role },
+    });
+
+    return { id: user.id, name: user.name, email: user.email, role: user.role, tenantId: user.tenantId };
   }
 
-  async login(data: LoginInput, ip?: string) {
-    const user = await prisma.user.findUnique({ where: { email: data.email } });
+  async login(data: LoginInput, ip?: string, userAgent?: string) {
+    const tenantId = await resolveTenantId(data.tenantSlug);
+    const user = await prisma.user.findFirst({
+      where: {
+        tenantId,
+        email: data.email.toLowerCase(),
+        deletedAt: null,
+      },
+    });
+
     if (!user || !user.active) {
-      await audit({ userEmail: data.email, action: 'LOGIN_FALHOU', detail: 'Usuario nao encontrado ou inativo', ip });
-      throw new AppError('Credenciais invalidas', 401);
+      await audit({
+        tenantId,
+        userEmail: data.email.toLowerCase(),
+        action: AuditAction.LOGIN,
+        detail: 'Falha de login: usuário não encontrado ou inativo',
+        ip,
+        userAgent,
+      });
+      throw new AppError('Credenciais inválidas', 401);
     }
+
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
       throw new AppError(`Conta bloqueada. Tente novamente em ${minutes} minuto(s).`, 423);
     }
+
     const valid = await bcrypt.compare(data.password, user.password);
     if (!valid) {
-      const attempts = user.loginAttempts + 1;
-      const locked = attempts >= MAX_ATTEMPTS;
+      const attempts = user.failedLoginCount + 1;
+      const lockMinutes = lockMinutesForAttempt(attempts);
       await prisma.user.update({
         where: { id: user.id },
         data: {
           loginAttempts: attempts,
-          lockedUntil: locked ? new Date(Date.now() + LOCK_MINUTES * 60 * 1000) : null,
+          failedLoginCount: attempts,
+          lockedUntil: lockMinutes > 0 ? new Date(Date.now() + lockMinutes * 60 * 1000) : null,
+          version: { increment: 1 },
         },
       });
+
       await audit({
+        tenantId,
         userId: user.id,
         userEmail: user.email,
-        action: 'LOGIN_FALHOU',
-        detail: `Tentativa ${attempts}/${MAX_ATTEMPTS}`,
+        entity: 'User',
+        entityId: user.id,
+        action: AuditAction.LOGIN,
+        detail: `Falha de login. Tentativa ${attempts}`,
         ip,
+        userAgent,
       });
-      if (locked) throw new AppError(`Conta bloqueada por ${LOCK_MINUTES} minutos apos ${MAX_ATTEMPTS} tentativas.`, 423);
-      throw new AppError('Credenciais invalidas', 401);
-    }
-    await prisma.user.update({ where: { id: user.id }, data: { loginAttempts: 0, lockedUntil: null } });
-    await audit({ userId: user.id, userEmail: user.email, action: 'LOGIN', detail: 'Login realizado com sucesso', ip });
-    return { id: user.id, name: user.name, email: user.email, role: user.role };
-  }
 
-  async issueRefreshToken(userId: string): Promise<string> {
-    const token = crypto.randomBytes(40).toString('hex');
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
-    await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
-    return token;
-  }
+      throw new AppError(lockMinutes > 0 ? `Conta bloqueada por ${lockMinutes} minuto(s).` : 'Credenciais inválidas', lockMinutes > 0 ? 423 : 401);
+    }
 
-  async rotateRefreshToken(token: string) {
-    const record = await prisma.refreshToken.findUnique({
-      where: { token },
-      include: { user: true },
-    });
-    if (!record || record.revokedAt || record.expiresAt < new Date()) {
-      throw new AppError('Refresh token invalido ou expirado', 401);
-    }
-    if (!record.user.active) {
-      throw new AppError('Usuario inativo', 401);
-    }
-    await prisma.refreshToken.update({
-      where: { id: record.id },
-      data: { revokedAt: new Date() },
-    });
-    const newToken = await this.issueRefreshToken(record.userId);
-    return {
-      user: {
-        id: record.user.id,
-        name: record.user.name,
-        email: record.user.email,
-        role: record.user.role,
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        loginAttempts: 0,
+        failedLoginCount: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        version: { increment: 1 },
       },
-      refreshToken: newToken,
+    });
+
+    await audit({
+      tenantId,
+      userId: user.id,
+      userEmail: user.email,
+      entity: 'User',
+      entityId: user.id,
+      action: AuditAction.LOGIN,
+      detail: 'Login realizado com sucesso',
+      ip,
+      userAgent,
+    });
+
+    return {
+      id: user.id,
+      tenantId: user.tenantId,
+      name: user.name,
+      email: user.email,
+      role: user.role,
     };
   }
 
-  async revokeRefreshToken(token: string) {
+  async issueRefreshToken(userId: string, tenantId: string, meta?: { ip?: string; userAgent?: string; sessionId?: string }) {
+    const rawToken = crypto.randomBytes(48).toString('hex');
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const sessionId = meta?.sessionId ?? crypto.randomUUID();
+
+    await prisma.refreshToken.create({
+      data: {
+        tenantId,
+        token: hashToken(rawToken),
+        userId,
+        sessionId,
+        expiresAt,
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+      },
+    });
+
+    return rawToken;
+  }
+
+  async rotateRefreshToken(token: string, meta?: { ip?: string; userAgent?: string }) {
+    const hashed = hashToken(token);
+    const record = await prisma.refreshToken.findFirst({
+      where: { token: hashed },
+      include: { user: true },
+    });
+
+    if (!record || record.revokedAt || record.expiresAt < new Date()) {
+      throw new AppError('Refresh token inválido ou expirado', 401);
+    }
+
+    if (!record.user.active || record.user.deletedAt) {
+      throw new AppError('Usuário inativo', 401);
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.refreshToken.update({
+        where: { id: record.id },
+        data: { revokedAt: new Date() },
+      });
+
+      const newToken = crypto.randomBytes(48).toString('hex');
+      const newHash = hashToken(newToken);
+
+      await tx.refreshToken.create({
+        data: {
+          tenantId: record.tenantId,
+          token: newHash,
+          userId: record.userId,
+          sessionId: record.sessionId,
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000),
+          ip: meta?.ip ?? record.ip,
+          userAgent: meta?.userAgent ?? record.userAgent,
+        },
+      });
+
+      await audit({
+        tenantId: record.tenantId,
+        userId: record.userId,
+        userEmail: record.user.email,
+        entity: 'RefreshToken',
+        entityId: record.id,
+        action: AuditAction.TOKEN_REFRESH,
+        detail: 'Refresh token rotacionado',
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+      });
+
+      return {
+        user: {
+          id: record.user.id,
+          tenantId: record.user.tenantId,
+          name: record.user.name,
+          email: record.user.email,
+          role: record.user.role,
+        },
+        refreshToken: newToken,
+      };
+    });
+  }
+
+  async revokeRefreshToken(token: string, meta?: { ip?: string; userAgent?: string }) {
+    const hashed = hashToken(token);
+    const record = await prisma.refreshToken.findFirst({ where: { token: hashed } });
+    if (!record) return;
+
     await prisma.refreshToken.updateMany({
-      where: { token, revokedAt: null },
+      where: { token: hashed, revokedAt: null },
       data: { revokedAt: new Date() },
+    });
+
+    await audit({
+      tenantId: record.tenantId,
+      userId: record.userId,
+      entity: 'RefreshToken',
+      entityId: record.id,
+      action: AuditAction.LOGOUT,
+      detail: 'Sessão encerrada',
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
     });
   }
 
@@ -130,37 +286,88 @@ export class AuthService {
     });
   }
 
-  async forgotPassword(email: string, baseUrl: string, ip?: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.active) return;
+  async forgotPassword(email: string, baseUrl: string, ip?: string, userAgent?: string, tenantSlug?: string) {
+    const tenantId = await resolveTenantId(tenantSlug);
+    const user = await prisma.user.findFirst({
+      where: { tenantId, email: email.toLowerCase(), active: true, deletedAt: null },
+    });
+
+    if (!user) return;
+
     await prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
       data: { usedAt: new Date() },
     });
-    const token = crypto.randomBytes(32).toString('hex');
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
     await prisma.passwordResetToken.create({
-      data: { token, userId: user.id, expiresAt: new Date(Date.now() + 30 * 60 * 1000) },
+      data: {
+        tenantId,
+        token: hashToken(rawToken),
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      },
     });
-    const resetUrl = baseUrl + '/reset-password?token=' + token;
+
+    const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
     const domain = new URL(baseUrl).hostname;
     const html = buildPasswordResetEmail(user.name ?? '', resetUrl, domain);
-    await sendEmail(user.email, 'Redefinicao de senha - Guardiao', html);
-    await audit({ userId: user.id, userEmail: user.email, action: 'SENHA_RESET_SOLICITADO', ip });
+    await sendEmail(user.email, 'Redefinição de senha - Guardião', html);
+
+    await audit({
+      tenantId,
+      userId: user.id,
+      userEmail: user.email,
+      entity: 'User',
+      entityId: user.id,
+      action: AuditAction.PASSWORD_RESET,
+      detail: 'Solicitação de redefinição de senha',
+      ip,
+      userAgent,
+    });
   }
 
-  async resetPassword(token: string, newPassword: string, ip?: string) {
-    const record = await prisma.passwordResetToken.findUnique({ where: { token } });
+  async resetPassword(token: string, newPassword: string, ip?: string, userAgent?: string) {
+    const hashedToken = hashToken(token);
+    const record = await prisma.passwordResetToken.findFirst({ where: { token: hashedToken } });
     if (!record || record.usedAt || record.expiresAt < new Date()) {
-      throw new AppError('Link invalido ou expirado', 400);
+      throw new AppError('Link inválido ou expirado', 400);
     }
-    const hashed = await bcrypt.hash(newPassword, 12);
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
     await prisma.$transaction([
       prisma.user.update({
         where: { id: record.userId },
-        data: { password: hashed, loginAttempts: 0, lockedUntil: null, passwordChangedAt: new Date() },
+        data: {
+          password: passwordHash,
+          loginAttempts: 0,
+          failedLoginCount: 0,
+          lockedUntil: null,
+          passwordChangedAt: new Date(),
+          version: { increment: 1 },
+        },
       }),
-      prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+      prisma.refreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     ]);
-    await audit({ userId: record.userId, action: 'SENHA_REDEFINIDA', ip });
+
+    await audit({
+      tenantId: record.tenantId,
+      userId: record.userId,
+      entity: 'User',
+      entityId: record.userId,
+      action: AuditAction.PASSWORD_RESET,
+      detail: 'Senha redefinida',
+      ip,
+      userAgent,
+    });
   }
 }
+

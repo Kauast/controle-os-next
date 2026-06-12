@@ -12,8 +12,11 @@ export function useVisibleOrders(): (ServiceOrder & { _backendId: string })[] {
   const activeTeam = useAppStore((s) => s.activeTeam);
 
   const { data } = useServiceOrders({ limit: 100 });
-  const backendOrders = data?.serviceOrders ?? [];
-  const adapted = useMemo(() => adaptBackendOrders(backendOrders), [backendOrders]);
+  const backendOrders = data?.serviceOrders;
+  const adapted = useMemo(
+    () => adaptBackendOrders(backendOrders ?? []),
+    [backendOrders],
+  );
 
   return useMemo(() => {
     if (access.seesAllOrders(role)) return adapted;

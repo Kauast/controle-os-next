@@ -6,7 +6,7 @@ import { SectionHeading } from "@/components/ui/card";
 import { access } from "@/lib/access";
 import { orderTone, sortOrders, toneBorder } from "@/lib/orders";
 import { TEAMS } from "@/lib/types";
-import { cn, userInitials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/use-app-store";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
 import { useTechnicians } from "@/hooks/useTechnicians";
@@ -114,7 +114,7 @@ function OSCard({
 
       <footer className="mt-2 pt-2 border-t border-dashed border-border flex items-center gap-1.5">
         <div className="size-5 rounded-full bg-onyx text-silver grid place-items-center text-[8px] font-mono-tabular shrink-0">
-          {userInitials(order.tech)}
+          {techInitials(order.tech)}
         </div>
         <span className="text-[10px] text-foreground/60 truncate">
           {order.tech || "Não atribuído"}

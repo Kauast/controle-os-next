@@ -1,4 +1,2 @@
-import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+export { prisma, type PrismaTransaction } from '../database/prisma/client';
 
-export const prisma = new PrismaClient();
