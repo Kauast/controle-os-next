@@ -118,7 +118,7 @@ export default function Home() {
           href="/tecnico"
           className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-zinc-100 lg:hidden"
         >
-          <Smartphone className="size-4" /> App do tecnico
+          <Smartphone className="size-4" /> App do técnico
         </Link>
       </main>
 

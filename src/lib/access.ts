@@ -53,9 +53,9 @@ export function defaultSection(role: Role): SectionKey {
 }
 
 export const roleViewCopy: Record<Role, { context: string; title: string }> = {
-  admin:       { context: "Gestao geral",  title: "Dashboard" },
+  admin:       { context: "Gestão geral",  title: "Dashboard" },
   atendimento: { context: "Atendimento",   title: "Agenda e OS" },
   estoque:     { context: "Almoxarifado",  title: "Estoque" },
-  tecnico:     { context: "Tecnico",       title: "Minhas OS" },
+  tecnico:     { context: "Técnico",       title: "Minhas OS" },
   financeiro:  { context: "Financeiro",    title: "Financeiro" },
 };

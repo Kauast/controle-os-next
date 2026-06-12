@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogIn, LogOut, Plus, Search } from "lucide-react";
+import { Bell, LogIn, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { roleViewCopy } from "@/lib/access";
 import { useAppStore } from "@/store/use-app-store";
@@ -36,7 +36,7 @@ export function Topbar() {
           <Button
             variant="icon"
             size="icon"
-            aria-label="Notificacoes"
+            aria-label="Notificações"
             className="size-10 rounded-2xl border border-white/10 bg-transparent text-zinc-200 hover:bg-white/10"
           >
             <Bell className="size-4" />
