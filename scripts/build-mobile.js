@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Build mobile: troca next.config.ts pelo mobile e desativa rotas incompatíveis
 // com output:"export" (middleware.ts e src/app/api/).
 

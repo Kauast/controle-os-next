@@ -7,27 +7,57 @@ import { Toaster } from "sonner";
 import { queryClient } from "@/lib/react-query/queryClient";
 import { useAuthStore } from "@/store/use-auth-store";
 import { useAppStore } from "@/store/use-app-store";
-import { backendRoleToFrontend } from "@/lib/auth";
-import type { AuthUser } from "@/lib/auth";
+import {
+  fetchCurrentSessionProfile,
+  getFrontendRole,
+  toAuthStoreUser,
+} from "@/lib/auth/session";
+import { getStoredMobileUser } from "@/lib/auth/mobile-session";
+import { isCapacitorApp } from "@/lib/platform/capacitor";
 
 function AuthInitializer() {
   const setUser = useAuthStore((s) => s.setUser);
   const setLoading = useAuthStore((s) => s.setLoading);
+  const clear = useAuthStore((s) => s.clear);
   const setRole = useAppStore((s) => s.setRole);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { user: AuthUser } | null) => {
-        if (data?.user) {
-          setUser(data.user);
-          setRole(backendRoleToFrontend(data.user.role));
-        } else {
-          setUser(null);
+    let cancelled = false;
+
+    async function bootstrapSession() {
+      try {
+        const profile = await fetchCurrentSessionProfile();
+        if (cancelled) {
+          return;
         }
-      })
-      .catch(() => setLoading(false));
-  }, [setUser, setLoading, setRole]);
+
+        setUser(toAuthStoreUser(profile));
+        setRole(getFrontendRole(profile.role));
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        if (isCapacitorApp()) {
+          const storedUser = await getStoredMobileUser();
+          if (storedUser && !cancelled) {
+            setUser(storedUser);
+            setRole(getFrontendRole(storedUser.role));
+            return;
+          }
+        }
+
+        clear();
+        setLoading(false);
+      }
+    }
+
+    bootstrapSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clear, setLoading, setRole, setUser]);
 
   return null;
 }
