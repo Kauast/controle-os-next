@@ -17,6 +17,16 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 0,
+      backgroundColor: "#0d0d0d",
+    },
+    Camera: {
+      // Permite câmera traseira por padrão
+    },
+    Geolocation: {
+      // Requisitar permissão de localização precisa
+    },
+    Preferences: {
+      // Storage seguro nativo
     },
   },
 };

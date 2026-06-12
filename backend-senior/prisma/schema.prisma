@@ -7,21 +7,72 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  password      String
-  role          Role      @default(ATTENDANT)
-  active        Boolean   @default(true)
-  loginAttempts Int       @default(0)
-  lockedUntil   DateTime?
-  passwordChangedAt DateTime?
-  createdAt     DateTime  @default(now())
+// ─── MULTI-TENANT ────────────────────────────────────────────────────────────
 
-  passwordResetTokens PasswordResetToken[]
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  document  String   @unique
+  plan      PlanType @default(BASIC)
+  active    Boolean  @default(true)
+  maxUsers  Int      @default(10)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  users         User[]
+  clients       Client[]
+  technicians   Technician[]
+  teams         Team[]
+  serviceOrders ServiceOrder[]
+  products      Product[]
+  chips         Chip[]
+  auditLogs     AuditLog[]
+}
+
+
+enum PlanType {
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  name              String?
+  email             String
+  password          String
+  role              Role      @default(ATTENDANT)
+  active            Boolean   @default(true)
+  loginAttempts     Int       @default(0)
+  lockedUntil       DateTime?
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+  deletedBy         String?
+
   refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   auditLogs           AuditLog[]
+  technician          Technician?
+
+  @@unique([email, companyId])
+  @@index([companyId])
+  @@index([email])
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  STOCK
+  TECHNICIAN
+  ATTENDANT
+  FINANCIAL
 }
 
 model RefreshToken {
@@ -47,21 +98,80 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 }
 
-model AuditLog {
+// ─── TEAM ─────────────────────────────────────────────────────────────────────
+
+model Team {
   id        String   @id @default(cuid())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  userEmail String?
-  action    String
-  detail    String?
-  ip        String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  deletedBy String?
+
+  members       TeamMember[]
+  serviceOrders ServiceOrder[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
 }
 
+model TeamMember {
+  id           String     @id @default(cuid())
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id])
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  isLeader     Boolean    @default(false)
+  joinedAt     DateTime   @default(now())
+
+  @@unique([teamId, technicianId])
+}
+
+// ─── TECHNICIAN ──────────────────────────────────────────────────────────────
+
+model Technician {
+  id              String           @id @default(cuid())
+  companyId       String
+  company         Company          @relation(fields: [companyId], references: [id])
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id])
+  name            String
+  phone           String           @default("")
+  specialty       String?
+  status          TechnicianStatus @default(AVAILABLE)
+  maxConcurrentOS Int              @default(5)
+  isActive        Boolean          @default(true)
+  version         Int              @default(1)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  deletedBy       String?
+
+  teamMemberships TeamMember[]
+  serviceOrders   ServiceOrder[]
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+}
+
+enum TechnicianStatus {
+  AVAILABLE
+  BUSY
+  OFF
+  VACATION
+}
+
+// ─── CLIENT ──────────────────────────────────────────────────────────────────
+
 model Client {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
   name          String
-  document      String    @unique
+  document      String
   phone         String?
   email         String?
   address       String?
@@ -69,181 +179,134 @@ model Client {
   city          String?
   state         String?
   contactName   String?
-  isBlocked     Boolean   @default(false)
+  isBlocked     Boolean  @default(false)
   blockedReason String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?
 
   serviceOrders ServiceOrder[]
-  payments      Payment[]
   chips         Chip[]
+  invoices      Invoice[]
+
+  @@unique([companyId, document])
+  @@index([companyId])
+  @@index([document])
 }
 
-model Chip {
-  id             String     @id @default(cuid())
-  iccid          String     @unique
-  phoneNumber    String?
-  operator       String?
-  model          String?
-  status         ChipStatus @default(ACTIVE)
-  notes          String?
+// ─── PRODUCT & STOCK ─────────────────────────────────────────────────────────
 
-  clientId       String?
-  client         Client?      @relation(fields: [clientId], references: [id])
+model ProductCategory {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  serviceOrderId String?
-  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  products Product[]
 
-  installedAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-}
-
-enum ChipStatus {
-  ACTIVE
-  INACTIVE
-  MAINTENANCE
-}
-
-model Technician {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  name            String
-  phone           String   @default("")
-  team            String   @default("")
-  specialty       String?
-  statusField     String   @default("Disponivel")
-  maxConcurrentOS Int      @default(5)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-
-  serviceOrders ServiceOrder[]
-}
-
-model ServiceOrder {
-  id                 String     @id @default(cuid())
-  number             Int        @unique @default(autoincrement())
-  clientId           String
-  client             Client     @relation(fields: [clientId], references: [id])
-  technicianId       String?
-  technician         Technician? @relation(fields: [technicianId], references: [id])
-  status             Status     @default(OPEN)
-  openingDate        DateTime   @default(now())
-  dueDate            DateTime
-  startDate          DateTime?
-  completionDate     DateTime?
-  cancellationReason String?
-  totalAmount        Decimal    @default(0) @db.Decimal(10, 2)
-  clientAuthorized   Boolean    @default(false)
-  version            Int        @default(1)
-
-  team               String     @default("Sem equipe")
-  priority           Priority   @default(NORMAL)
-  scheduledTime      String?
-
-  description        String?
-  checkinAt          DateTime?
-  checkoutAt         DateTime?
-  checkinLocation    String?
-  photoUrls          String[]   @default([])
-  clientSignature    String?
-  chipId             String?
-
-  createdById        String?
-
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-
-  items            OSItem[]
-  payments         Payment[]
-  materialRequests MaterialRequest[]
-  stockMovements   StockMovement[]
-  chips            Chip[]
-}
-
-enum Priority {
-  NORMAL
-  WARNING
-  HIGH
-}
-
-enum Status {
-  OPEN
-  IN_PROGRESS
-  WAITING_PARTS
-  COMPLETED
-  CANCELLED
-}
-
-model OSItem {
-  id             String       @id @default(cuid())
-  serviceOrderId String
-  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
-  productId      String?
-  product        Product?     @relation(fields: [productId], references: [id])
-  description    String
-  quantity       Int          @default(1)
-  unitPrice      Decimal      @db.Decimal(10, 2)
-  itemType       ItemType     @default(SERVICE)
-  createdAt      DateTime     @default(now())
-}
-
-enum ItemType {
-  PRODUCT
-  SERVICE
+  @@unique([companyId, name])
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  sku           String   @unique
-  description   String?
-  category      String   @default("")
-  location      String   @default("")
-  stockQuantity Int      @default(0)
-  minStock      Int      @default(0)
-  cost          Decimal  @default(0) @db.Decimal(10, 2)
-  price         Decimal  @db.Decimal(10, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String           @id @default(cuid())
+  companyId   String
+  company     Company          @relation(fields: [companyId], references: [id])
+  categoryId  String?
+  category    ProductCategory? @relation(fields: [categoryId], references: [id])
+  name        String
+  sku         String
+  description String?
+  location    String           @default("")
+  minStock    Int              @default(0)
+  cost        Decimal          @default(0) @db.Decimal(10, 2)
+  price       Decimal          @db.Decimal(10, 2)
+  version     Int              @default(1)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+  deletedBy   String?
 
-  items            OSItem[]
-  stockMovements   StockMovement[]
-  materialRequests MaterialRequest[]
+  items             ServiceOrderItem[]
+  stockMovements    StockMovement[]
+  stockReservations StockReservation[]
+  materialRequests  MaterialRequest[]
+
+  @@unique([companyId, sku])
+  @@index([companyId, categoryId])
+  @@index([sku])
 }
 
+// StockMovement é a fonte de verdade do estoque.
+// balanceBefore/balanceAfter permitem auditoria e reconstrução rápida.
 model StockMovement {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
+  companyId      String
   productId      String
-  product        Product      @relation(fields: [productId], references: [id])
+  product        Product       @relation(fields: [productId], references: [id])
   type           MovementType
   quantity       Int
+  balanceBefore  Int
+  balanceAfter   Int
+  unitCost       Decimal?      @db.Decimal(10, 2)
   reason         String?
   serviceOrderId String?
   serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
   userId         String?
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime      @default(now())
+
+  @@index([companyId, productId])
+  @@index([productId, createdAt])
+  @@index([serviceOrderId])
 }
 
 enum MovementType {
   IN
   OUT
+  TRANSFER
   ADJUSTMENT
+  LOSS
+  RETURN
+}
+
+model StockReservation {
+  id             String            @id @default(cuid())
+  companyId      String
+  productId      String
+  product        Product           @relation(fields: [productId], references: [id])
+  serviceOrderId String
+  serviceOrder   ServiceOrder      @relation(fields: [serviceOrderId], references: [id])
+  quantity       Int
+  status         ReservationStatus @default(ACTIVE)
+  createdAt      DateTime          @default(now())
+  releasedAt     DateTime?
+
+  @@index([productId, status])
+  @@index([serviceOrderId])
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
 }
 
 model MaterialRequest {
-  id             String          @id @default(cuid())
+  id             String        @id @default(cuid())
   serviceOrderId String
-  serviceOrder   ServiceOrder    @relation(fields: [serviceOrderId], references: [id])
+  serviceOrder   ServiceOrder  @relation(fields: [serviceOrderId], references: [id])
   productId      String
-  product        Product         @relation(fields: [productId], references: [id])
+  product        Product       @relation(fields: [productId], references: [id])
   quantity       Int
-  status         RequestStatus   @default(PENDING)
+  status         RequestStatus @default(PENDING)
   requestedBy    String?
   reviewedBy     String?
   reviewNote     String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 enum RequestStatus {
@@ -252,31 +315,370 @@ enum RequestStatus {
   REJECTED
 }
 
-model Payment {
-  id             String        @id @default(cuid())
+// ─── CHIP ────────────────────────────────────────────────────────────────────
+
+model Chip {
+  id             String     @id @default(cuid())
+  companyId      String
+  company        Company    @relation(fields: [companyId], references: [id])
+  iccid          String
+  phoneNumber    String?
+  operator       String?
+  model          String?
+  status         ChipStatus @default(ACTIVE)
+  notes          String?
+  clientId       String?
+  client         Client?    @relation(fields: [clientId], references: [id])
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  installedAt    DateTime?
+  version        Int        @default(1)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
+
+  history ChipHistory[]
+
+  @@unique([companyId, iccid])
+  @@index([companyId, clientId])
+  @@index([companyId, status])
+}
+
+enum ChipStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+model ChipHistory {
+  id             String   @id @default(cuid())
+  chipId         String
+  chip           Chip     @relation(fields: [chipId], references: [id])
+  fromClientId   String?
+  toClientId     String?
+  serviceOrderId String?
+  action         String
+  notes          String?
+  userId         String?
+  createdAt      DateTime @default(now())
+
+  @@index([chipId])
+}
+
+// ─── SERVICE ORDER ───────────────────────────────────────────────────────────
+
+model ServiceOrder {
+  id                 String      @id @default(cuid())
+  companyId          String
+  company            Company     @relation(fields: [companyId], references: [id])
+  number             Int
+  clientId           String
+  client             Client      @relation(fields: [clientId], references: [id])
+  technicianId       String?
+  technician         Technician? @relation(fields: [technicianId], references: [id])
+  teamId             String?
+  team               Team?       @relation(fields: [teamId], references: [id])
+  status             OrderStatus @default(OPEN)
+  priority           Priority    @default(NORMAL)
+  openingDate        DateTime    @default(now())
+  dueDate            DateTime
+  startDate          DateTime?
+  completionDate     DateTime?
+  cancellationReason String?
+  totalAmount        Decimal     @default(0) @db.Decimal(10, 2)
+  clientAuthorized   Boolean     @default(false)
+  description        String?
+  internalNotes      String?
+  chipIccid          String?
+  createdById        String?
+  version            Int         @default(1)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+  deletedBy          String?
+
+  items             ServiceOrderItem[]
+  schedule          ServiceOrderSchedule?
+  execution         ServiceOrderExecution?
+  history           ServiceOrderHistory[]
+  events            ServiceOrderEvent[]
+  attachments       Attachment[]
+  materialRequests  MaterialRequest[]
+  stockMovements    StockMovement[]
+  stockReservations StockReservation[]
+  chips             Chip[]
+  invoices          Invoice[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status, openingDate])
+  @@index([companyId, clientId, status])
+  @@index([companyId, technicianId, status])
+  @@index([companyId, teamId, status])
+  @@index([companyId, priority, openingDate])
+}
+
+enum OrderStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  NORMAL
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+model ServiceOrderItem {
+  id             String       @id @default(cuid())
   serviceOrderId String
-  serviceOrder   ServiceOrder  @relation(fields: [serviceOrderId], references: [id])
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  productId      String?
+  product        Product?     @relation(fields: [productId], references: [id])
+  description    String
+  quantity       Int          @default(1)
+  unitPrice      Decimal      @db.Decimal(10, 2)
+  discount       Decimal      @default(0) @db.Decimal(10, 2)
+  total          Decimal      @db.Decimal(10, 2)
+  itemType       ItemType     @default(SERVICE)
+  createdAt      DateTime     @default(now())
+
+  @@index([serviceOrderId])
+}
+
+enum ItemType {
+  PRODUCT
+  SERVICE
+}
+
+model ServiceOrderSchedule {
+  id             String       @id @default(cuid())
+  serviceOrderId String       @unique
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  scheduledDate  DateTime
+  scheduledTime  String?
+  estimatedHours Decimal?     @db.Decimal(4, 2)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ServiceOrderExecution {
+  id              String       @id @default(cuid())
+  serviceOrderId  String       @unique
+  serviceOrder    ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  checkinAt       DateTime?
+  checkoutAt      DateTime?
+  checkinLocation String?
+  checkinLat      Decimal?     @db.Decimal(10, 7)
+  checkinLng      Decimal?     @db.Decimal(10, 7)
+  checkoutLat     Decimal?     @db.Decimal(10, 7)
+  checkoutLng     Decimal?     @db.Decimal(10, 7)
+  workDoneNotes   String?
+  photoUrls       String[]     @default([])
+  clientSignature String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+// Histórico imutável — nunca deletar registros
+model ServiceOrderHistory {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  userId         String?
+  action         String
+  fromStatus     OrderStatus?
+  toStatus       OrderStatus?
+  note           String?
+  before         Json?
+  after          Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([serviceOrderId, createdAt])
+}
+
+model ServiceOrderEvent {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  eventType      String
+  description    String
+  userId         String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([serviceOrderId])
+}
+
+// ─── ATTACHMENTS ─────────────────────────────────────────────────────────────
+
+model Attachment {
+  id              String   @id @default(cuid())
+  companyId       String
+  entityType      String
+  entityId        String
+  serviceOrderId  String?
+  serviceOrder    ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  fileName        String
+  originalName    String
+  mimeType        String
+  fileSize        Int
+  storageProvider String   @default("local")
+  storagePath     String
+  hash            String?
+  uploadedBy      String?
+  createdAt       DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([companyId])
+}
+
+// ─── FINANCIAL ───────────────────────────────────────────────────────────────
+
+model Invoice {
+  id             String        @id @default(cuid())
+  companyId      String
+  number         Int
   clientId       String
   client         Client        @relation(fields: [clientId], references: [id])
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  status         InvoiceStatus @default(DRAFT)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  discount       Decimal       @default(0) @db.Decimal(10, 2)
+  tax            Decimal       @default(0) @db.Decimal(10, 2)
+  total          Decimal       @db.Decimal(10, 2)
+  dueDate        DateTime
+  notes          String?
+  version        Int           @default(1)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  payments           Payment[]
+  financialMovements FinancialMovement[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status, dueDate])
+  @@index([companyId, clientId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+// Pagamentos jamais são deletados — somente cancelados
+model Payment {
+  id             String        @id @default(cuid())
+  companyId      String
+  invoiceId      String
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id])
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  method         PaymentMethod @default(CASH)
   amount         Decimal       @db.Decimal(10, 2)
+  discount       Decimal       @default(0) @db.Decimal(10, 2)
+  interest       Decimal       @default(0) @db.Decimal(10, 2)
+  fine           Decimal       @default(0) @db.Decimal(10, 2)
+  netAmount      Decimal       @db.Decimal(10, 2)
   dueDate        DateTime
   paidAt         DateTime?
   status         PaymentStatus @default(PENDING)
+  installmentOf  Int?
+  installmentNum Int?
+  cancelledAt    DateTime?
+  cancelledBy    String?
+  cancelReason   String?
+  notes          String?
+  version        Int           @default(1)
   createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  financialMovements FinancialMovement[]
+
+  @@index([companyId, status, dueDate])
+  @@index([companyId, clientId])
+  @@index([invoiceId])
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  BOLETO
+  CHECK
 }
 
 enum PaymentStatus {
   PENDING
   PAID
+  PARTIAL
   OVERDUE
   CANCELLED
 }
 
-enum Role {
-  ADMIN
-  SUPERVISOR
-  STOCK
-  TECHNICIAN
-  ATTENDANT
-  FINANCIAL
+model FinancialMovement {
+  id           String                @id @default(cuid())
+  companyId    String
+  type         FinancialMovementType
+  category     String
+  description  String
+  amount       Decimal               @db.Decimal(10, 2)
+  paymentId    String?
+  payment      Payment?              @relation(fields: [paymentId], references: [id])
+  invoiceId    String?
+  invoice      Invoice?              @relation(fields: [invoiceId], references: [id])
+  userId       String?
+  reference    String?
+  notes        String?
+  movementDate DateTime              @default(now())
+  createdAt    DateTime              @default(now())
+
+  @@index([companyId, type, movementDate])
+  @@index([companyId, category])
+}
+
+enum FinancialMovementType {
+  INCOME
+  EXPENSE
+  REFUND
+  ADJUSTMENT
+}
+
+// ─── AUDIT ────────────────────────────────────────────────────────────────────
+
+// AuditLog é append-only. Jamais deletar ou atualizar registros.
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  userEmail String?
+  entity    String?
+  entityId  String?
+  action    String
+  before    Json?
+  after     Json?
+  detail    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
 }

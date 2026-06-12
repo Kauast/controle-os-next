@@ -13,7 +13,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 
   // Invalida JWT se a senha foi alterada após a emissão do token.
-  const decoded = request.user as { id: string; iat?: number; role: string };
+  const decoded = request.user as { id: string; iat?: number; role: string; companyId: string };
   if (decoded.id && decoded.iat) {
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },

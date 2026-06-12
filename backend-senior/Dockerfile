@@ -38,4 +38,4 @@ USER fastify
 
 EXPOSE 3333
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed && npm run start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]

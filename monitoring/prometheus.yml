@@ -1,26 +1,36 @@
 global:
-  scrape_interval:     15s
+  scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    monitor: controle-os
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
 
 scrape_configs:
+  - job_name: backend
+    static_configs:
+      - targets: [backend:3333]
+    metrics_path: /metrics
+    params:
+      format: [prometheus]
+
   - job_name: node
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: [node-exporter:9100]
     relabel_configs:
       - target_label: instance
         replacement: vps
 
   - job_name: postgres
     static_configs:
-      - targets: ['postgres-exporter:9187']
+      - targets: [postgres-exporter:9187]
 
   - job_name: redis
     static_configs:
-      - targets: ['redis-exporter:9121']
-
-  - job_name: backend
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['backend:3333']
-    # Só coleta se o backend expor /metrics (opcional por enquanto)
-    honor_timestamps: true
+      - targets: [redis-exporter:9121]

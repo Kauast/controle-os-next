@@ -1,4 +1,5 @@
 import { Queue, Worker } from 'bullmq';
+import { logger } from '../lib/logger';
 
 const redisUrl = new URL(process.env.REDIS_URL ?? 'redis://localhost:6379');
 
@@ -16,18 +17,18 @@ export const worker = new Worker(
   async (job) => {
     switch (job.name) {
       case 'os.completed':
-        console.log(`Notificando cliente da OS ${job.data.osId}`);
+        logger.info({ event: 'job_os_completed', jobId: job.id, osId: job.data.osId }, 'OS concluída — notificando cliente');
         break;
       case 'os.cancelled':
-        console.log(`OS ${job.data.osId} cancelada. Motivo: ${job.data.reason}`);
+        logger.info({ event: 'job_os_cancelled', jobId: job.id, osId: job.data.osId, reason: job.data.reason }, 'OS cancelada');
         break;
       default:
-        console.warn(`Job desconhecido: ${job.name}`);
+        logger.warn({ event: 'job_unknown', jobId: job.id, jobName: job.name }, 'Job desconhecido recebido');
     }
   },
   { connection: redisConnection }
 );
 
 worker.on('failed', (job, err) => {
-  console.error(`Job ${job?.id} falhou:`, err.message);
+  logger.error({ event: 'job_failed', jobId: job?.id, jobName: job?.name, err: err.message }, 'Job falhou');
 });

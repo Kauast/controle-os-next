@@ -1,7 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate, authorize } from '../middlewares/auth';
 import { prisma } from '../lib/prisma';
+import { StockService } from '../modules/stock/stock.service';
 import { z } from 'zod';
+
+const stockService = new StockService();
 
 const createSchema = z.object({
   serviceOrderId: z.string().min(1),
@@ -16,6 +19,11 @@ const reviewSchema = z.object({
   reviewedBy: z.string().optional(),
 });
 
+interface RequestUser {
+  id: string;
+  companyId: string;
+}
+
 export default async function materialRequestRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate);
 
@@ -23,12 +31,16 @@ export default async function materialRequestRoutes(app: FastifyInstance) {
     '/',
     async (request, reply) => {
       const { serviceOrderId, status } = request.query;
+      const user = request.user as RequestUser;
       const where: Record<string, unknown> = {};
       if (serviceOrderId) where.serviceOrderId = serviceOrderId;
       if (status) where.status = status;
 
       const requests = await prisma.materialRequest.findMany({
-        where,
+        where: {
+          ...where,
+          serviceOrder: { companyId: user.companyId },
+        },
         include: { product: true, serviceOrder: { include: { client: true } } },
         orderBy: { createdAt: 'desc' },
       });
@@ -38,16 +50,17 @@ export default async function materialRequestRoutes(app: FastifyInstance) {
 
   app.post('/', { onRequest: authorize('ADMIN', 'ATTENDANT', 'TECHNICIAN') }, async (request, reply) => {
     const data = createSchema.parse(request.body);
+    const user = request.user as RequestUser;
 
     const [product, os] = await Promise.all([
-      prisma.product.findUnique({ where: { id: data.productId } }),
-      prisma.serviceOrder.findUnique({ where: { id: data.serviceOrderId } }),
+      prisma.product.findFirst({ where: { id: data.productId, companyId: user.companyId } }),
+      prisma.serviceOrder.findFirst({ where: { id: data.serviceOrderId, companyId: user.companyId } }),
     ]);
-    if (!product) throw new Error('Produto não encontrado');
-    if (!os) throw new Error('OS não encontrada');
+    if (!product) return reply.status(404).send({ error: 'Produto não encontrado' });
+    if (!os) return reply.status(404).send({ error: 'OS não encontrada' });
 
     const req = await prisma.materialRequest.create({
-      data,
+      data: { ...data, requestedBy: data.requestedBy ?? user.id },
       include: { product: true, serviceOrder: { include: { client: true } } },
     });
     return reply.status(201).send(req);
@@ -59,31 +72,34 @@ export default async function materialRequestRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { id } = request.params;
       const data = reviewSchema.parse(request.body);
+      const user = request.user as RequestUser;
 
-      const req = await prisma.materialRequest.findUnique({ where: { id } });
-      if (!req) throw new Error('Solicitação não encontrada');
-      if (req.status !== 'PENDING') throw new Error('Solicitação já foi revisada');
+      const req = await prisma.materialRequest.findFirst({
+        where: { id, serviceOrder: { companyId: user.companyId } },
+      });
+      if (!req) return reply.status(404).send({ error: 'Solicitação não encontrada' });
+      if (req.status !== 'PENDING') return reply.status(422).send({ error: 'Solicitação já foi revisada' });
 
       const updated = await prisma.$transaction(async (tx) => {
         const result = await tx.materialRequest.update({
           where: { id },
-          data: { status: data.status, reviewNote: data.reviewNote, reviewedBy: data.reviewedBy },
+          data: {
+            status: data.status,
+            reviewNote: data.reviewNote,
+            reviewedBy: data.reviewedBy ?? user.id,
+          },
           include: { product: true },
         });
 
         if (data.status === 'APPROVED') {
-          await tx.product.update({
-            where: { id: req.productId },
-            data: { stockQuantity: { decrement: req.quantity } },
-          });
-          await tx.stockMovement.create({
-            data: {
-              productId: req.productId,
-              type: 'OUT',
-              quantity: req.quantity,
-              reason: `Solicitação de material para OS`,
-              serviceOrderId: req.serviceOrderId,
-            },
+          await stockService.adjustStock({
+            companyId: user.companyId,
+            productId: req.productId,
+            type: 'OUT',
+            quantity: req.quantity,
+            reason: `Solicitação de material para OS ${req.serviceOrderId}`,
+            serviceOrderId: req.serviceOrderId,
+            userId: user.id,
           });
         }
 
@@ -99,11 +115,15 @@ export default async function materialRequestRoutes(app: FastifyInstance) {
     { onRequest: authorize('ADMIN', 'ATTENDANT', 'TECHNICIAN') },
     async (request, reply) => {
       const { id } = request.params;
-      const req = await prisma.materialRequest.findUnique({ where: { id } });
-      if (!req) throw new Error('Solicitação não encontrada');
-      if (req.status !== 'PENDING') throw new Error('Só é possível cancelar solicitações pendentes');
+      const user = request.user as RequestUser;
 
-      await prisma.materialRequest.delete({ where: { id } });
+      const req = await prisma.materialRequest.findFirst({
+        where: { id, serviceOrder: { companyId: user.companyId } },
+      });
+      if (!req) return reply.status(404).send({ error: 'Solicitação não encontrada' });
+      if (req.status !== 'PENDING') return reply.status(422).send({ error: 'Só é possível cancelar solicitações pendentes' });
+
+      await prisma.materialRequest.deleteMany({ where: { id } });
       return reply.send({ success: true });
     }
   );

@@ -1,34 +1,35 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { ClientService, createClientSchema, updateClientSchema, ImportClientInput } from '../services/clientService';
+import { ClientService, createClientSchema, updateClientSchema } from '../services/clientService';
 
 const service = new ClientService();
+
+interface RequestUser {
+  id: string;
+  companyId: string;
+}
 
 export class ClientController {
   async create(request: FastifyRequest, reply: FastifyReply) {
     const data = createClientSchema.parse(request.body);
-    const result = await service.create(data);
+    const user = request.user as RequestUser;
+    const result = await service.create(data, user);
     return reply.status(201).send(result);
   }
 
-  async importBatch(request: FastifyRequest, reply: FastifyReply) {
-    const { items } = request.body as { items: ImportClientInput[] };
-    if (!Array.isArray(items) || items.length === 0) {
-      return reply.status(400).send({ error: 'items deve ser um array não vazio' });
-    }
-    if (items.length > 2000) {
-      return reply.status(400).send({ error: 'Máximo de 2000 clientes por importação' });
-    }
-    const result = await service.importBatch(items);
-    return reply.send(result);
-  }
-
   async list(
-    request: FastifyRequest<{ Querystring: { page?: string; limit?: string; search?: string } }>,
+    request: FastifyRequest<{ Querystring: { page?: string; limit?: string; search?: string; isBlocked?: string } }>,
     reply: FastifyReply
   ) {
-    const { page, limit, search } = request.query;
+    const { page, limit, search, isBlocked } = request.query;
+    const user = request.user as RequestUser;
     return reply.send(
-      await service.list({ page: page ? +page : 1, limit: limit ? +limit : 10, search })
+      await service.list({
+        companyId: user.companyId,
+        page: page ? +page : 1,
+        limit: limit ? +limit : 10,
+        search,
+        isBlocked: isBlocked !== undefined ? isBlocked === 'true' : undefined,
+      })
     );
   }
 
@@ -36,7 +37,8 @@ export class ClientController {
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ) {
-    return reply.send(await service.findById(request.params.id));
+    const user = request.user as RequestUser;
+    return reply.send(await service.findById(request.params.id, user.companyId));
   }
 
   async update(
@@ -44,14 +46,25 @@ export class ClientController {
     reply: FastifyReply
   ) {
     const data = updateClientSchema.parse(request.body);
-    return reply.send(await service.update(request.params.id, data));
+    const user = request.user as RequestUser;
+    return reply.send(await service.update(request.params.id, data, user));
   }
 
   async delete(
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ) {
-    await service.delete(request.params.id);
+    const user = request.user as RequestUser;
+    await service.delete(request.params.id, user);
     return reply.status(204).send();
+  }
+
+  async toggleBlock(
+    request: FastifyRequest<{ Params: { id: string }; Body: { blocked: boolean; reason?: string } }>,
+    reply: FastifyReply
+  ) {
+    const { blocked, reason } = request.body;
+    const user = request.user as RequestUser;
+    return reply.send(await service.toggleBlock(request.params.id, blocked, reason, user));
   }
 }

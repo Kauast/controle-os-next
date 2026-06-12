@@ -26,9 +26,14 @@ export const updateExecutionSchema = z.object({
   checkinAt: z.string().datetime().optional(),
   checkoutAt: z.string().datetime().optional(),
   checkinLocation: z.string().optional(),
+  checkinLat: z.number().optional(),
+  checkinLng: z.number().optional(),
+  checkoutLat: z.number().optional(),
+  checkoutLng: z.number().optional(),
   photoUrls: z.array(z.string()).optional(),
   clientSignature: z.string().optional(),
   chipId: z.string().optional(),
+  workDoneNotes: z.string().optional(),
 });
 
 export type UpdateExecutionInput = z.infer<typeof updateExecutionSchema>;

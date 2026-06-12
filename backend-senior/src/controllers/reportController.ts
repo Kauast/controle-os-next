@@ -1,6 +1,9 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import dayjs from 'dayjs';
 import { prisma } from '../lib/prisma';
+import { StockService } from '../modules/stock/stock.service';
+
+const stockService = new StockService();
 
 function hashTeam(s: string): number {
   let h = 0;
@@ -10,58 +13,86 @@ function hashTeam(s: string): number {
 
 export class ReportController {
   async teamReport(
-    request: FastifyRequest<{ Querystring: { team?: string } }>,
+    request: FastifyRequest<{ Querystring: { team?: string; companyId?: string } }>,
     reply: FastifyReply
   ) {
-    const { team } = request.query;
+    const { team, companyId } = request.query;
+    const user = request.user as { id: string; companyId: string };
+    const cid = companyId ?? user.companyId;
 
     const technicians = await prisma.technician.findMany({
       where: {
+        companyId: cid,
         isActive: true,
-        ...(team && team !== 'all' ? { team } : {}),
+        ...(team && team !== 'all'
+          ? { teamMemberships: { some: { team: { name: team } } } }
+          : {}),
       },
       include: {
+        teamMemberships: { include: { team: { select: { name: true } } }, take: 1 },
         serviceOrders: {
+          where: { companyId: cid },
           select: { id: true, status: true, completionDate: true },
         },
       },
       orderBy: { name: 'asc' },
     });
 
+    const statusLabel: Record<string, string> = {
+      AVAILABLE: 'Disponivel',
+      BUSY: 'Ocupado',
+      OFF: 'Folga',
+      VACATION: 'Ferias',
+    };
+
     const rows = technicians.map((tech) => {
       const completed = tech.serviceOrders.filter((o) => o.status === 'COMPLETED').length;
       const total = tech.serviceOrders.length;
+      const teamName = tech.teamMemberships[0]?.team?.name ?? tech.name;
+      const statusStr = statusLabel[tech.status] ?? tech.status;
       return {
-        team: tech.team || tech.name,
+        team: teamName,
         technicianId: tech.id,
         name: tech.name,
         completed,
         total,
-        status: tech.statusField,
-        pill: tech.statusField === 'Disponivel' ? 'teal' : 'amber',
+        status: statusStr,
+        pill: tech.status === 'AVAILABLE' ? 'teal' : 'amber',
       };
     });
 
     return reply.send(rows);
   }
 
-  async financeSummary(_request: FastifyRequest, reply: FastifyReply) {
+  async financeSummary(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const user = request.user as { id: string; companyId: string };
     const sixMonthsAgo = dayjs().subtract(5, 'month').startOf('month').toDate();
 
     const [products, completedOrders, openOrders] = await Promise.all([
-      prisma.product.findMany({ select: { stockQuantity: true, cost: true } }),
+      prisma.product.findMany({
+        where: { companyId: user.companyId, deletedAt: null },
+        select: { id: true, cost: true },
+      }),
       prisma.serviceOrder.findMany({
-        where: { status: 'COMPLETED', completionDate: { gte: sixMonthsAgo } },
+        where: { companyId: user.companyId, status: 'COMPLETED', completionDate: { gte: sixMonthsAgo } },
         include: { items: true },
         orderBy: { completionDate: 'asc' },
       }),
       prisma.serviceOrder.findMany({
-        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] } },
+        where: { companyId: user.companyId, status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] } },
         include: { items: true },
       }),
     ]);
 
-    const stockValue = products.reduce((sum, p) => sum + p.stockQuantity * Number(p.cost), 0);
+    // Calcula valor do estoque somando balances (simplificado: usa último movimento de cada produto)
+    let stockValue = 0;
+    for (const p of products) {
+      const balance = await stockService.getBalance(p.id);
+      stockValue += balance.physical * Number(p.cost);
+    }
 
     const materialSold = completedOrders.reduce((sum, os) => {
       return sum + os.items
@@ -77,7 +108,6 @@ export class ReportController {
 
     const forecast = openOrders.reduce((sum, os) => sum + Number(os.totalAmount), 0);
 
-    // Agrupa os últimos 6 meses
     const monthlyMap = new Map<string, { material: number; services: number }>();
     for (let i = 5; i >= 0; i--) {
       monthlyMap.set(dayjs().subtract(i, 'month').format('YYYY-MM'), { material: 0, services: 0 });
@@ -106,12 +136,18 @@ export class ReportController {
     return reply.send({ materialSold, servicesScheduled, forecast, stockValue, monthly });
   }
 
-  async teamLocations(_request: FastifyRequest, reply: FastifyReply) {
+  async teamLocations(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const user = request.user as { id: string; companyId: string };
+
     const technicians = await prisma.technician.findMany({
-      where: { isActive: true },
+      where: { companyId: user.companyId, isActive: true },
       include: {
+        teamMemberships: { include: { team: { select: { name: true } } }, take: 1 },
         serviceOrders: {
-          where: { status: { in: ['IN_PROGRESS', 'OPEN'] } },
+          where: { companyId: user.companyId, status: { in: ['IN_PROGRESS', 'OPEN'] } },
           orderBy: { updatedAt: 'desc' },
           take: 1,
           select: { number: true },
@@ -119,38 +155,46 @@ export class ReportController {
       },
     });
 
+    const statusLabel: Record<string, string> = {
+      AVAILABLE: 'Disponivel',
+      BUSY: 'Em rota',
+      OFF: 'Folga',
+      VACATION: 'Ferias',
+    };
+
     const teamMap = new Map<string, { members: string[]; os: string; inProgress: boolean }>();
     for (const tech of technicians) {
-      const team = tech.team || 'Sem equipe';
+      const teamName = tech.teamMemberships[0]?.team?.name ?? 'Sem equipe';
       const activeOS = tech.serviceOrders[0];
-      if (!teamMap.has(team)) {
-        teamMap.set(team, {
+      const inProgress = tech.status !== 'AVAILABLE';
+      if (!teamMap.has(teamName)) {
+        teamMap.set(teamName, {
           members: [tech.name],
           os: activeOS ? `OS-${activeOS.number}` : 'Sem OS',
-          inProgress: tech.statusField !== 'Disponivel',
+          inProgress,
         });
       } else {
-        const entry = teamMap.get(team)!;
+        const entry = teamMap.get(teamName)!;
         entry.members.push(tech.name);
-        if (tech.statusField !== 'Disponivel') entry.inProgress = true;
+        if (inProgress) entry.inProgress = true;
         if (entry.os === 'Sem OS' && activeOS) entry.os = `OS-${activeOS.number}`;
       }
     }
 
     const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    const locations = Array.from(teamMap.entries()).map(([team, info]) => {
-      const h = hashTeam(team);
+    const locations = Array.from(teamMap.entries()).map(([teamName, info]) => {
+      const h = hashTeam(teamName);
       const baseX = 15 + (h % 68);
       const baseY = 15 + ((h >> 8) % 62);
       return {
-        team,
+        team: teamName,
         members: info.members.join(', ') || 'Sem tecnico',
         x: Math.min(88, Math.max(8, baseX + Math.floor(Math.random() * 7) - 3)),
         y: Math.min(82, Math.max(14, baseY + Math.floor(Math.random() * 7) - 3)),
         speed: info.inProgress ? 20 + Math.floor(Math.random() * 50) : 0,
-        status: info.inProgress ? 'Em rota' : 'Disponivel',
-        vehicle: `Veiculo ${team.replace(/\D/g, '') || '1'}`,
+        status: info.inProgress ? statusLabel.BUSY : statusLabel.AVAILABLE,
+        vehicle: `Veiculo ${teamName.replace(/\D/g, '') || '1'}`,
         updated: time,
         currentOS: info.os,
       };
@@ -159,22 +203,25 @@ export class ReportController {
     return reply.send(locations);
   }
 
-  async attendantReport(_request: FastifyRequest, reply: FastifyReply) {
+  async attendantReport(request: FastifyRequest, reply: FastifyReply) {
+    const user = request.user as { id: string; companyId: string };
+
     const [users, osByCreator, pendingByCreator] = await Promise.all([
       prisma.user.findMany({
-        where: { role: { in: ['ADMIN', 'ATTENDANT'] }, active: true },
+        where: { companyId: user.companyId, role: { in: ['ADMIN', 'ATTENDANT'] }, active: true },
         select: { id: true, email: true, role: true, createdAt: true },
         orderBy: { email: 'asc' },
       }),
       prisma.serviceOrder.groupBy({
         by: ['createdById'],
         _count: { id: true },
-        where: { createdById: { not: null } },
+        where: { companyId: user.companyId, createdById: { not: null } },
       }),
       prisma.serviceOrder.groupBy({
         by: ['createdById'],
         _count: { id: true },
         where: {
+          companyId: user.companyId,
           createdById: { not: null },
           status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] },
         },
@@ -197,8 +244,10 @@ export class ReportController {
     return reply.send(rows);
   }
 
-  async listUsers(_request: FastifyRequest, reply: FastifyReply) {
+  async listUsers(request: FastifyRequest, reply: FastifyReply) {
+    const user = request.user as { id: string; companyId: string };
     const users = await prisma.user.findMany({
+      where: { companyId: user.companyId },
       select: { id: true, email: true, role: true, active: true, createdAt: true },
       orderBy: { email: 'asc' },
     });

@@ -43,10 +43,15 @@ export const cache = {
     }
   },
 
+  // SCAN em vez de KEYS — não bloqueia Redis em produção (O(N) não-bloqueante)
   async del(pattern: string): Promise<void> {
     try {
-      const keys = await redis.keys(pattern);
-      if (keys.length) await redis.del(...keys);
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+        if (keys.length) await redis.del(...keys);
+      } while (cursor !== '0');
     } catch (err) {
       logger.warn({ event: 'cache_del_failed', pattern, err: (err as Error).message }, 'Falha ao invalidar cache');
     }

@@ -1,45 +1,54 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { Status, Priority } from '@prisma/client';
+import { OrderStatus, Priority } from '@prisma/client';
 import {
   ServiceOrderService,
   createOSSchema,
   updateExecutionSchema,
+  updateStatusSchema,
+  assignSchema,
 } from '../services/serviceOrderService';
 
 const service = new ServiceOrderService();
 
+interface RequestUser {
+  id: string;
+  role: string;
+  companyId: string;
+}
+
 export class ServiceOrderController {
   async create(request: FastifyRequest, reply: FastifyReply) {
     const data = createOSSchema.parse(request.body);
-    const user = request.user as { id: string };
-    const result = await service.create(data, user.id);
+    const user = request.user as RequestUser;
+    const result = await service.create(data, user);
     return reply.status(201).send(result);
   }
 
   async updateStatus(
     request: FastifyRequest<{
       Params: { id: string };
-      Body: { status: string; cancellationReason?: string };
+      Body: { status: string; cancellationReason?: string; note?: string };
     }>,
     reply: FastifyReply
   ) {
     const { id } = request.params;
-    const { status, cancellationReason } = request.body;
-    const requester = request.user as { id: string; role: string };
-    const result = await service.updateStatus(id, status as Status, cancellationReason, requester);
+    const input = updateStatusSchema.parse(request.body);
+    const user = request.user as RequestUser;
+    const result = await service.updateStatus(id, input, user);
     return reply.send(result);
   }
 
   async assign(
     request: FastifyRequest<{
       Params: { id: string };
-      Body: { team: string; technicianId?: string | null };
+      Body: { technicianId?: string | null; teamId?: string | null };
     }>,
     reply: FastifyReply
   ) {
     const { id } = request.params;
-    const { team, technicianId } = request.body;
-    const result = await service.assign(id, team, technicianId);
+    const input = assignSchema.parse(request.body);
+    const user = request.user as RequestUser;
+    const result = await service.assign(id, input, user);
     return reply.send(result);
   }
 
@@ -49,7 +58,8 @@ export class ServiceOrderController {
   ) {
     const { id } = request.params;
     const data = updateExecutionSchema.parse(request.body);
-    const result = await service.updateExecution(id, data);
+    const user = request.user as RequestUser;
+    const result = await service.updateExecution(id, data, user);
     return reply.send(result);
   }
 
@@ -58,20 +68,27 @@ export class ServiceOrderController {
       Querystring: {
         status?: string;
         priority?: string;
-        team?: string;
+        teamId?: string;
         technicianId?: string;
+        clientId?: string;
+        search?: string;
         page?: string;
         limit?: string;
       };
     }>,
     reply: FastifyReply
   ) {
-    const { status, priority, team, technicianId, page, limit } = request.query;
+    const { status, priority, teamId, technicianId, clientId, search, page, limit } =
+      request.query;
+    const user = request.user as RequestUser;
     const result = await service.list({
-      status: status as Status | undefined,
+      companyId: user.companyId,
+      status: status as OrderStatus | undefined,
       priority: priority as Priority | undefined,
-      team,
+      teamId,
       technicianId,
+      clientId,
+      search,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20,
     });
@@ -82,7 +99,8 @@ export class ServiceOrderController {
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ) {
-    const result = await service.delete(request.params.id);
+    const user = request.user as RequestUser;
+    const result = await service.delete(request.params.id, user);
     return reply.send(result);
   }
 
@@ -90,7 +108,8 @@ export class ServiceOrderController {
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ) {
-    const result = await service.findById(request.params.id);
+    const user = request.user as RequestUser;
+    const result = await service.findById(request.params.id, user.companyId);
     return reply.send(result);
   }
 }

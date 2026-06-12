@@ -1,0 +1,72 @@
+groups:
+  - name: controle-os
+    interval: 30s
+    rules:
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Serviço {{ $labels.job }} está down"
+          description: "O serviço {{ $labels.job }} não responde há mais de 1 minuto."
+
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status_code=~"5.."}[5m])
+          / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taxa de erros HTTP 5xx elevada"
+          description: "Taxa de erros 5xx acima de 5% nos últimos 5 minutos."
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência p95 elevada"
+          description: "P95 da latência HTTP acima de 2s nos últimos 5 minutos."
+
+      - alert: DatabaseDown
+        expr: dependency_up{dependency="database"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Banco de dados indisponível"
+          description: "O PostgreSQL não está respondendo."
+
+      - alert: RedisDown
+        expr: dependency_up{dependency="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis indisponível"
+          description: "O Redis não está respondendo."
+
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de memória elevado"
+          description: "Uso de memória acima de 85% por mais de 5 minutos."
+
+      - alert: DiskSpaceLow
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Espaço em disco baixo"
+          description: "Uso de disco acima de 80%."

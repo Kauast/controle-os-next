@@ -1,10 +1,13 @@
 import Fastify, { FastifyInstance, FastifyBaseLogger } from 'fastify';
 import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
+import staticPlugin from '@fastify/static';
 import serviceOrderRoutes from './routes/serviceOrderRoutes';
 import clientRoutes from './routes/clientRoutes';
 import technicianRoutes from './routes/technicianRoutes';
@@ -134,6 +137,15 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
     reply.header('Content-Type', metricsContentType);
     return reply.send(await metricsText());
+  });
+
+  // Serve pasta de uploads (fotos, assinaturas)
+  const uploadDir = process.env.UPLOAD_DIR ? join(process.cwd(), process.env.UPLOAD_DIR) : join(process.cwd(), 'uploads');
+  if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
+  await app.register(staticPlugin, {
+    root: uploadDir,
+    prefix: '/uploads/',
+    decorateReply: false,
   });
 
   await app.register(authRoutes, { prefix: '/api/auth' });
