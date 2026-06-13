@@ -1,5 +1,5 @@
 import { Prisma, OrderStatus, Priority } from '@prisma/client';
-import { prisma } from '../../lib/prisma';
+import { prisma, TxClient } from '../../lib/prisma';
 import { audit } from '../audit/audit.service';
 import { StockService } from '../stock/stock.service';
 import {
@@ -432,7 +432,7 @@ export class ServiceOrderService {
   // ─── PRIVATE HELPERS ──────────────────────────────────────────────────────────
 
   private async _validateTechnicianCapacity(
-    tx: Prisma.TransactionClient,
+    tx: TxClient,
     technicianId: string,
     companyId: string,
     excludeOsId?: string,

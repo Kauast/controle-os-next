@@ -1,4 +1,4 @@
-import { Status } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 import { z } from 'zod';
 
 export const createOSSchema = z.object({
@@ -38,7 +38,7 @@ export const updateExecutionSchema = z.object({
 
 export type UpdateExecutionInput = z.infer<typeof updateExecutionSchema>;
 
-const allowedTransitions: Record<Status, Status[]> = {
+const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   OPEN: ['IN_PROGRESS', 'CANCELLED'],
   IN_PROGRESS: ['WAITING_PARTS', 'COMPLETED', 'CANCELLED'],
   WAITING_PARTS: ['IN_PROGRESS', 'CANCELLED'],
@@ -46,6 +46,6 @@ const allowedTransitions: Record<Status, Status[]> = {
   CANCELLED: [],
 };
 
-export function canTransition(from: Status, to: Status): boolean {
+export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return allowedTransitions[from]?.includes(to) ?? false;
 }
