@@ -433,7 +433,11 @@ export default function TecnicoMobilePage() {
       setChipDraft("");
       setCheckedIn(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao finalizar OS";
+      const axiosMsg =
+        (err as { response?: { data?: { error?: string; message?: string } } })?.response?.data
+          ?.error ??
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const msg = axiosMsg ?? (err instanceof Error ? err.message : "Erro ao finalizar OS");
       toast.error(msg);
     }
   }

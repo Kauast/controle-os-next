@@ -43,8 +43,11 @@ export class ServiceOrderService {
       if (activeOS >= 3) throw new AppError('Cliente já possui 3 OS em andamento (máximo permitido)', 422);
 
       const dueDate = new Date(data.dueDate);
-      if (dueDate < new Date(new Date().setHours(0, 0, 0, 0))) {
-        throw new AppError('Prazo deve ser no mínimo hoje', 422);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (dueDate < tomorrow) {
+        throw new AppError('Prazo deve ser no mínimo amanhã', 422);
       }
 
       if (data.technicianId) {
@@ -154,6 +157,27 @@ export class ServiceOrderService {
       }
 
       if (input.status === 'COMPLETED') {
+        const execution = await tx.serviceOrderExecution.findUnique({ where: { serviceOrderId: id } });
+
+        // 1. Checkin obrigatório
+        if (!execution?.checkinAt) {
+          throw new AppError('OS não pode ser concluída: check-in não realizado', 422);
+        }
+
+        // 2. Mínimo 3 fotos (novo contrato: attachmentIds; fallback: photoUrls legado)
+        const photoCount = (execution.photoAttachmentIds?.length ?? 0) > 0
+          ? (execution.photoAttachmentIds?.length ?? 0)
+          : (execution.photoUrls?.length ?? 0);
+        if (photoCount < 3) {
+          throw new AppError(`OS não pode ser concluída: ${photoCount}/3 fotos registradas`, 422);
+        }
+
+        // 3. Assinatura obrigatória
+        const hasSignature = execution.signatureAttachmentId || execution.clientSignature;
+        if (!hasSignature) {
+          throw new AppError('OS não pode ser concluída: assinatura do cliente não coletada', 422);
+        }
+
         const totalPaid = os.invoices
           .flatMap((inv) => inv.payments)
           .filter((p) => p.status === 'PAID')
@@ -310,6 +334,8 @@ export class ServiceOrderService {
       if (data.workDoneNotes !== undefined) execData.workDoneNotes = data.workDoneNotes;
       if (data.photoUrls !== undefined) execData.photoUrls = data.photoUrls;
       if (data.clientSignature !== undefined) execData.clientSignature = data.clientSignature;
+      if (data.photoAttachmentIds !== undefined) execData.photoAttachmentIds = data.photoAttachmentIds;
+      if (data.signatureAttachmentId !== undefined) execData.signatureAttachmentId = data.signatureAttachmentId;
 
       await tx.serviceOrderExecution.upsert({
         where: { serviceOrderId: id },
@@ -344,6 +370,24 @@ export class ServiceOrderService {
     });
   }
 
+  // ─── SCOPE HELPER — garante isolamento por role e companyId ─────────────────
+
+  private async buildScopeWhere(user: RequestUser): Promise<Prisma.ServiceOrderWhereInput> {
+    // Todos os roles não-técnico vêem todas as OS da empresa
+    if (user.role !== 'TECHNICIAN') {
+      return { companyId: user.companyId };
+    }
+
+    // Técnico vê somente OS onde technicianId aponta para o Technician vinculado a este user
+    const tech = await prisma.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
+    if (!tech) {
+      // Técnico sem registro Technician — onde impossível garante lista vazia
+      return { companyId: user.companyId, id: 'impossible-scope-no-technician-record' };
+    }
+
+    return { companyId: user.companyId, technicianId: tech.id };
+  }
+
   // ─── LIST ─────────────────────────────────────────────────────────────────────
 
   async list(params: {
@@ -356,14 +400,17 @@ export class ServiceOrderService {
     search?: string;
     page?: number;
     limit?: number;
-  }) {
+  }, user: RequestUser) {
     const { page, limit, skip } = parsePagination(params);
-    const where: Prisma.ServiceOrderWhereInput = { companyId: params.companyId };
+
+    const scopeWhere = await this.buildScopeWhere(user);
+    const where: Prisma.ServiceOrderWhereInput = { ...scopeWhere };
 
     if (params.status) where.status = params.status;
     if (params.priority) where.priority = params.priority;
+    // Técnico não pode filtrar por technicianId de outro técnico
     if (params.teamId) where.teamId = params.teamId;
-    if (params.technicianId) where.technicianId = params.technicianId;
+    if (params.technicianId && user.role !== 'TECHNICIAN') where.technicianId = params.technicianId;
     if (params.clientId) where.clientId = params.clientId;
     if (params.search) {
       where.OR = [
@@ -392,9 +439,10 @@ export class ServiceOrderService {
     return buildPaginatedResult(data, total, page, limit);
   }
 
-  async findById(id: string, companyId: string) {
+  async findById(id: string, user: RequestUser) {
+    const scopeWhere = await this.buildScopeWhere(user);
     const os = await prisma.serviceOrder.findFirst({
-      where: { id, companyId },
+      where: { ...scopeWhere, id },
       include: {
         client: true,
         technician: true,
@@ -404,18 +452,20 @@ export class ServiceOrderService {
         execution: true,
         history: { orderBy: { createdAt: 'asc' } },
         events: { orderBy: { createdAt: 'asc' } },
-        attachments: true,
+        attachments: { where: { deletedAt: null } },
         materialRequests: { include: { product: { select: { id: true, name: true } } } },
         invoices: { include: { payments: true } },
       },
     });
+    // Sempre 404 para evitar enumeração — não revela se existe mas é de outro técnico
     if (!os) throw new NotFoundError('OS');
     return os;
   }
 
   // Soft delete — nunca deleta OS concluídas
   async delete(id: string, user: RequestUser) {
-    const os = await prisma.serviceOrder.findFirst({ where: { id, companyId: user.companyId } });
+    const scopeWhere = await this.buildScopeWhere(user);
+    const os = await prisma.serviceOrder.findFirst({ where: { ...scopeWhere, id } });
     if (!os) throw new NotFoundError('OS');
     if (os.status === 'COMPLETED') throw new AppError('Não é possível excluir uma OS concluída', 422);
     if (os.status === 'IN_PROGRESS') throw new AppError('Cancele a OS antes de excluir', 422);

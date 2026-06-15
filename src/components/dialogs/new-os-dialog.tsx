@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TEAMS } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, tomorrowDate } from "@/lib/utils";
 import { useUIStore } from "@/store/use-ui-store";
 import { useClients } from "@/hooks/useClients";
 import { useTechnicians } from "@/hooks/useTechnicians";
@@ -40,12 +40,6 @@ const stepFields: Record<number, (keyof Form)[]> = {
   2: ["description", "priority"],
   3: ["scheduledTime", "team", "dueDate"],
 };
-
-function tomorrowDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 2);
-  return d.toISOString().split("T")[0];
-}
 
 export function NewOsDialog() {
   const open = useUIStore((s) => s.newOsOpen);
@@ -110,7 +104,11 @@ export function NewOsDialog() {
       });
       setOpen(false);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erro ao criar OS.");
+      const axiosMsg =
+        (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data
+          ?.error ??
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(axiosMsg ?? (e instanceof Error ? e.message : "Erro ao criar OS."));
     }
   }
 

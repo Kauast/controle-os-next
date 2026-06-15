@@ -70,9 +70,16 @@ export const updateExecutionSchema = z.object({
   checkoutLat: z.number().optional(),
   checkoutLng: z.number().optional(),
   workDoneNotes: z.string().optional(),
-  chipIccid: z.string().optional(),
+  chipIccid: z.string()
+    .refine((v) => /\d{5,}/.test(v.replace(/\D/g, '')), {
+      message: 'ICCID deve conter ao menos 5 dígitos numéricos',
+    })
+    .optional(),
   photoUrls: z.array(z.string().url()).optional(),
   clientSignature: z.string().optional(),
+  // Novo contrato: IDs de anexos privados (cuid), não URLs.
+  photoAttachmentIds: z.array(z.string().min(1)).optional(),
+  signatureAttachmentId: z.string().min(1).optional(),
 });
 
 export const assignSchema = z.object({

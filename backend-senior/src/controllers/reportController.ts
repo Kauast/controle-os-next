@@ -253,4 +253,77 @@ export class ReportController {
     });
     return reply.send(users);
   }
+
+  async dashboardMetrics(request: FastifyRequest, reply: FastifyReply) {
+    const user = request.user as { companyId: string; role: string };
+    const companyId = user.companyId;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [
+      open,
+      inProgress,
+      urgent,
+      completedToday,
+      busyTechnicians,
+      totalTechnicians,
+    ] = await Promise.all([
+      prisma.serviceOrder.count({ where: { companyId, status: 'OPEN' } }),
+      prisma.serviceOrder.count({ where: { companyId, status: { in: ['IN_PROGRESS', 'WAITING_PARTS'] } } }),
+      prisma.serviceOrder.count({
+        where: { companyId, priority: 'HIGH', status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+      }),
+      prisma.serviceOrder.count({
+        where: { companyId, status: 'COMPLETED', completionDate: { gte: today, lt: tomorrow } },
+      }),
+      prisma.technician.count({
+        where: {
+          companyId,
+          serviceOrders: {
+            some: { status: { in: ['IN_PROGRESS', 'WAITING_PARTS'] } },
+          },
+        },
+      }),
+      prisma.technician.count({ where: { companyId, isActive: true } }),
+    ]);
+
+    const criticalStockResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint as count
+      FROM "Product" p
+      WHERE p."companyId" = ${companyId}
+        AND p."minStock" > 0
+        AND p."deletedAt" IS NULL
+        AND (
+          SELECT COALESCE(SUM(
+            CASE
+              WHEN sm.type IN ('IN', 'RETURN', 'ADJUSTMENT') THEN sm.quantity
+              WHEN sm.type IN ('OUT', 'TRANSFER', 'LOSS') THEN -sm.quantity
+              ELSE 0
+            END
+          ), 0)
+          FROM "StockMovement" sm
+          WHERE sm."productId" = p.id
+        ) <= p."minStock"
+    `;
+
+    return reply.send({
+      orders: {
+        open,
+        inProgress,
+        urgent,
+        completedToday,
+      },
+      stock: {
+        critical: Number(criticalStockResult[0]?.count ?? 0),
+      },
+      technicians: {
+        busy: busyTechnicians,
+        available: Math.max(0, totalTechnicians - busyTechnicians),
+        total: totalTechnicians,
+      },
+    });
+  }
 }
