@@ -131,6 +131,7 @@ function KanbanColumn({
   onDragLeave,
   onDrop,
   onDragStart,
+  onDragEnd,
   dragCode,
   showAddButton,
   onAdd,
@@ -144,6 +145,7 @@ function KanbanColumn({
   onDragLeave: () => void;
   onDrop: () => void;
   onDragStart: (code: string, backendId: string) => void;
+  onDragEnd?: () => void;
   dragCode: string | null;
   showAddButton?: boolean;
   onAdd?: () => void;
@@ -193,6 +195,7 @@ function KanbanColumn({
               e.stopPropagation();
               onDragStart(o.code, o._backendId ?? o.code);
             }}
+            onDragEnd={onDragEnd}
           >
             <OSCard order={o} isDragging={dragCode === o.code} />
           </div>
@@ -233,7 +236,7 @@ export function DispatchBoard() {
   const [pending, setPending] = useState<{ backendId: string; code: string; description: string; teamName: string } | null>(null);
 
   const technicianView = !access.seesAllOrders(role);
-  const available = sortOrders(orders.filter((o) => o.team === "Sem equipe"));
+  const available = sortOrders(orders.filter((o) => o.team === "Sem equipe" && (!o.scheduledDate || o.scheduledDate === date)));
   const { data: apiTeams = [] } = useTeams();
   const teamNames = apiTeams.map((t) => t.name);
   const teamsToShow = teamNames.length > 0 ? teamNames : TEAMS;
@@ -245,8 +248,22 @@ export function DispatchBoard() {
     return technicians.filter((t) => t.team === teamName).map((t) => t.name).join(", ") || "Sem técnico";
   };
 
+  function clearDrag() {
+    setDragCode(null);
+    setDragBackendId(null);
+    setOverTeam(null);
+  }
+
   function drop(teamName: string) {
     if (!dragBackendId || !dragCode) return;
+
+    // Unassign goes directly, no modal needed
+    if (teamName === "Sem equipe") {
+      assignOrder.mutate({ id: dragBackendId, team: "Sem equipe" });
+      clearDrag();
+      return;
+    }
+
     const order = orders.find((o) => o._backendId === dragBackendId);
     setPending({
       backendId: dragBackendId,
@@ -254,9 +271,7 @@ export function DispatchBoard() {
       description: order?.description ?? "",
       teamName,
     });
-    setDragCode(null);
-    setDragBackendId(null);
-    setOverTeam(null);
+    clearDrag();
   }
 
   function confirmAssign(scheduledStart: string) {
@@ -315,6 +330,7 @@ export function DispatchBoard() {
                 onDragLeave={() => setOverTeam((t) => (t === "Sem equipe" ? null : t))}
                 onDrop={() => drop("Sem equipe")}
                 onDragStart={startDrag}
+                onDragEnd={clearDrag}
                 dragCode={dragCode}
               />
             </div>
@@ -339,6 +355,7 @@ export function DispatchBoard() {
                     onDragLeave={() => setOverTeam((t) => (t === team ? null : t))}
                     onDrop={() => drop(team)}
                     onDragStart={startDrag}
+                    onDragEnd={clearDrag}
                     dragCode={dragCode}
                   />
                 );
