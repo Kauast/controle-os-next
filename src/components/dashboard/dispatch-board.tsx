@@ -11,6 +11,8 @@ import { useAppStore } from "@/store/use-app-store";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
 import { useTechnicians } from "@/hooks/useTechnicians";
 import { useAssignServiceOrder } from "@/hooks/useServiceOrders";
+import { useTeams } from "@/hooks/useTeams";
+import { AssignModal } from "@/components/dashboard/assign-modal";
 import type { ServiceOrder } from "@/lib/types";
 
 /* ── helpers ── */
@@ -227,19 +229,42 @@ export function DispatchBoard() {
   const [dragCode, setDragCode] = useState<string | null>(null);
   const [dragBackendId, setDragBackendId] = useState<string | null>(null);
   const [overTeam, setOverTeam] = useState<string | null>(null);
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [pending, setPending] = useState<{ backendId: string; code: string; description: string; teamName: string } | null>(null);
 
   const technicianView = !access.seesAllOrders(role);
   const available = sortOrders(orders.filter((o) => o.team === "Sem equipe"));
-  const visibleTeams = technicianView ? TEAMS.filter((t) => t === activeTeam) : TEAMS;
+  const { data: apiTeams = [] } = useTeams();
+  const teamNames = apiTeams.map((t) => t.name);
+  const teamsToShow = teamNames.length > 0 ? teamNames : TEAMS;
+  const visibleTeams = technicianView ? (teamsToShow as string[]).filter((t) => t === activeTeam) : teamsToShow;
 
-  const teamMembers = (team: string) =>
-    technicians.filter((t) => t.team === team).map((t) => t.name).join(", ") || "Sem tecnico";
+  const teamMembers = (teamName: string) => {
+    const apiTeam = apiTeams.find((t) => t.name === teamName);
+    if (apiTeam) return apiTeam.members.map((m) => m.name).join(", ");
+    return technicians.filter((t) => t.team === teamName).map((t) => t.name).join(", ") || "Sem técnico";
+  };
 
-  function drop(team: string) {
-    if (dragBackendId) assignOrder.mutate({ id: dragBackendId, team });
+  function drop(teamName: string) {
+    if (!dragBackendId || !dragCode) return;
+    const order = orders.find((o) => o._backendId === dragBackendId);
+    setPending({
+      backendId: dragBackendId,
+      code: dragCode,
+      description: order?.description ?? "",
+      teamName,
+    });
     setDragCode(null);
     setDragBackendId(null);
     setOverTeam(null);
+  }
+
+  function confirmAssign(scheduledStart: string) {
+    if (!pending) return;
+    assignOrder.mutate(
+      { id: pending.backendId, team: pending.teamName, scheduledStart },
+      { onSuccess: () => setPending(null), onError: () => setPending(null) },
+    );
   }
 
   function startDrag(code: string, backendId: string) {
@@ -248,52 +273,91 @@ export function DispatchBoard() {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-panel p-5 shadow-[var(--shadow-panel)]">
-      <SectionHeading eyebrow="Agenda das equipes" title="OS do dia e despacho" />
-
-      <div className="flex gap-3">
-        {/* Available OS column — fixed, does not scroll */}
-        {!technicianView && (
-          <div className="shrink-0 w-[220px]">
-            <KanbanColumn
-              title="Disponíveis"
-              subtitle="Arraste para uma equipe"
-              orders={available}
-              isOver={overTeam === "Sem equipe"}
-              isEmpty
-              onDragOver={(e) => { e.preventDefault(); setOverTeam("Sem equipe"); }}
-              onDragLeave={() => setOverTeam((t) => (t === "Sem equipe" ? null : t))}
-              onDrop={() => drop("Sem equipe")}
-              onDragStart={startDrag}
-              dragCode={dragCode}
-            />
+    <>
+      <div className="rounded-lg border border-line bg-panel p-5 shadow-[var(--shadow-panel)]">
+        {/* Header com data */}
+        <div className="flex items-center justify-between mb-4">
+          <SectionHeading eyebrow="Agenda das equipes" title="OS do dia e despacho" />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setDate((d) => {
+                const dt = new Date(d); dt.setDate(dt.getDate() - 1); return dt.toISOString().slice(0, 10);
+              })}
+              className="px-2 py-1 text-[11px] text-muted border border-line rounded hover:bg-surface transition-colors"
+            >
+              ‹
+            </button>
+            <span className="text-[12px] text-muted font-mono min-w-[90px] text-center">
+              {new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
+            </span>
+            <button
+              onClick={() => setDate((d) => {
+                const dt = new Date(d); dt.setDate(dt.getDate() + 1); return dt.toISOString().slice(0, 10);
+              })}
+              className="px-2 py-1 text-[11px] text-muted border border-line rounded hover:bg-surface transition-colors"
+            >
+              ›
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* Team columns — scroll horizontally */}
-        <div className="flex-1 overflow-x-auto pb-2">
-          <div className="flex gap-3 min-w-max">
-            {visibleTeams.map((team) => {
-              const teamOrders = sortOrders(orders.filter((o) => o.team === team));
-              return (
-                <KanbanColumn
-                  key={team}
-                  title={team}
-                  subtitle={teamMembers(team)}
-                  orders={teamOrders}
-                  isOver={overTeam === team}
-                  isEmpty
-                  onDragOver={(e) => { e.preventDefault(); setOverTeam(team); }}
-                  onDragLeave={() => setOverTeam((t) => (t === team ? null : t))}
-                  onDrop={() => drop(team)}
-                  onDragStart={startDrag}
-                  dragCode={dragCode}
-                />
-              );
-            })}
+        <div className="flex gap-3">
+          {/* Available OS column — fixed, does not scroll */}
+          {!technicianView && (
+            <div className="shrink-0 w-[220px]">
+              <KanbanColumn
+                title="Disponíveis"
+                subtitle="Arraste para uma equipe"
+                orders={available}
+                isOver={overTeam === "Sem equipe"}
+                isEmpty
+                onDragOver={(e) => { e.preventDefault(); setOverTeam("Sem equipe"); }}
+                onDragLeave={() => setOverTeam((t) => (t === "Sem equipe" ? null : t))}
+                onDrop={() => drop("Sem equipe")}
+                onDragStart={startDrag}
+                dragCode={dragCode}
+              />
+            </div>
+          )}
+
+          {/* Team columns — scroll horizontally */}
+          <div className="flex-1 overflow-x-auto pb-2">
+            <div className="flex gap-3 min-w-max">
+              {visibleTeams.map((team) => {
+                const teamOrders = sortOrders(
+                  orders.filter((o) => o.team === team && (!o.scheduledDate || o.scheduledDate === date))
+                );
+                return (
+                  <KanbanColumn
+                    key={team}
+                    title={team}
+                    subtitle={teamMembers(team)}
+                    orders={teamOrders}
+                    isOver={overTeam === team}
+                    isEmpty
+                    onDragOver={(e) => { e.preventDefault(); setOverTeam(team); }}
+                    onDragLeave={() => setOverTeam((t) => (t === team ? null : t))}
+                    onDrop={() => drop(team)}
+                    onDragStart={startDrag}
+                    dragCode={dragCode}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {pending && (
+        <AssignModal
+          osCode={pending.code}
+          osDescription={pending.description}
+          teamName={pending.teamName}
+          onConfirm={confirmAssign}
+          onCancel={() => setPending(null)}
+          isPending={assignOrder.isPending}
+        />
+      )}
+    </>
   );
 }
