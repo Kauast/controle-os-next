@@ -17,7 +17,11 @@ export default async function reportRoutes(app: FastifyInstance) {
     { onRequest: authorize('ADMIN', 'FINANCIAL') },
     controller.financeSummary.bind(controller)
   );
-  app.get('/locations', controller.teamLocations.bind(controller));
+  app.get(
+    '/locations',
+    { onRequest: authorize('ADMIN', 'ATTENDANT', 'FINANCIAL', 'STOCK') },
+    controller.teamLocations.bind(controller)
+  );
   app.get(
     '/attendants',
     { onRequest: authorize('ADMIN', 'FINANCIAL') },
@@ -27,5 +31,10 @@ export default async function reportRoutes(app: FastifyInstance) {
     '/users',
     { onRequest: authorize('ADMIN') },
     controller.listUsers.bind(controller)
+  );
+  app.get(
+    '/dashboard',
+    { onRequest: authorize('ADMIN', 'ATTENDANT', 'FINANCIAL', 'STOCK') },
+    controller.dashboardMetrics.bind(controller),
   );
 }

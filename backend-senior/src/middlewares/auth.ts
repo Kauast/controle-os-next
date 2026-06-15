@@ -15,7 +15,9 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   // Invalida JWT se a senha foi alterada após a emissão do token.
   const decoded = request.user as { id: string; iat?: number; role: string; companyId: string };
   if (decoded.id && decoded.iat) {
-    const user = await prisma.user.findUnique({
+    // findFirst em vez de findUnique: a extensão de soft-delete injeta deletedAt=null
+    // no where de findFirst, mas rejeitaria findUnique (campo fora da chave única).
+    const user = await prisma.user.findFirst({
       where: { id: decoded.id },
       select: { passwordChangedAt: true, active: true },
     });

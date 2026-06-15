@@ -24,6 +24,7 @@ import {
 } from "@/hooks/useClients";
 import { useCreateChip, useDeleteChip, type Chip } from "@/hooks/useChips";
 import { useDebounce } from "@/hooks/useDebounce";
+import { parseClientCSV } from "@/lib/csv";
 
 const clientSchema = z.object({
   name: z.string().min(2, "Informe o nome"),
@@ -42,72 +43,6 @@ const emptyForm: ClientForm = {
   name: "", document: "", phone: "", email: "",
   address: "", neighborhood: "", city: "", state: "", contactName: "",
 };
-
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') { inQuotes = !inQuotes; }
-    else if (ch === "," && !inQuotes) { result.push(current); current = ""; }
-    else { current += ch; }
-  }
-  result.push(current);
-  return result;
-}
-
-function cleanPhone(raw: string): string {
-  if (!raw) return "";
-  const first = raw.split(/\s{2,}/)[0].trim();
-  return first.replace(/[^\d+()\-\s]/g, "").trim().slice(0, 20);
-}
-
-function parseCSV(text: string): ImportClientRow[] {
-  const lines = text.split(/\r?\n/);
-  const header = parseCSVLine(lines[0]);
-  const idx = {
-    codigo: header.indexOf("codigo"),
-    fantasia: header.indexOf("fantasia"),
-    razao_social: header.indexOf("razao_social"),
-    responsavel: header.indexOf("responsavel"),
-    logradouro: header.indexOf("logradouro"),
-    bairro: header.indexOf("bairro"),
-    cidade: header.indexOf("cidade"),
-    uf: header.indexOf("uf"),
-    telefone_1: header.indexOf("telefone_1"),
-  };
-
-  const seen = new Map<string, number>();
-  const rows: ImportClientRow[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const cols = parseCSVLine(line);
-    const codigo = cols[idx.codigo]?.trim() ?? "";
-    const fantasia = cols[idx.fantasia]?.trim() ?? "";
-    const razao = cols[idx.razao_social]?.trim() ?? "";
-    const name = fantasia || razao || `CLIENTE-${codigo}`;
-
-    const base = codigo.padStart(4, "0");
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    const document = count === 0 ? base : `${base}-${count}`;
-
-    rows.push({
-      name,
-      document,
-      phone: cleanPhone(cols[idx.telefone_1] ?? "") || undefined,
-      address: cols[idx.logradouro]?.trim() || undefined,
-      neighborhood: cols[idx.bairro]?.trim() || undefined,
-      city: cols[idx.cidade]?.trim() || undefined,
-      state: cols[idx.uf]?.trim() || undefined,
-      contactName: cols[idx.responsavel]?.trim() || undefined,
-    });
-  }
-  return rows;
-}
 
 interface ImportState {
   rows: ImportClientRow[];
@@ -190,7 +125,7 @@ export function ClientsPanel() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const rows = parseCSV(text);
+      const rows = parseClientCSV(text);
       setImportState({ rows, status: "preview" });
       setMode("import");
     };
@@ -244,9 +179,13 @@ export function ClientsPanel() {
             />
           </div>
 
-          {isLoading && (
-            <div className="py-10 text-center text-sm text-muted">Carregando clientes...</div>
-          )}
+          {isLoading ? (
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-[56px] animate-pulse rounded-[12px] bg-panel-soft/60" />
+              ))}
+            </div>
+          ) : null}
           {!isLoading && clients.length === 0 && (
             <div className="py-10 text-center text-sm text-muted">
               {search ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
@@ -495,7 +434,7 @@ function ClientDetail({
     );
   }
 
-  const chips: Chip[] = (fc as Client & { chips?: Chip[] }).chips ?? [];
+  const chips: Chip[] = fc.chips ?? [];
 
   return (
     <div className="flex flex-col gap-3 rounded-[14px] border border-line bg-panel-soft/40 p-4">

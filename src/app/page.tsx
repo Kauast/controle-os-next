@@ -23,8 +23,10 @@ import { ClientsDirectory } from "@/components/clients/clients-directory";
 import { NewOsDialog } from "@/components/dialogs/new-os-dialog";
 import { ScheduleDialog } from "@/components/dialogs/schedule-dialog";
 import { TeamLoginDialog } from "@/components/dialogs/team-login-dialog";
+import { AuditPanel } from "@/components/dashboard/audit-panel";
 import { canAccessSection, defaultSection, type SectionKey } from "@/lib/access";
 import { useAppStore } from "@/store/use-app-store";
+import { useAuthStore } from "@/store/use-auth-store";
 import { useUIStore } from "@/store/use-ui-store";
 import { useHydrated } from "@/hooks/use-hydrated";
 
@@ -64,12 +66,7 @@ function SectionView({ section }: { section: SectionKey }) {
     case "relatorios":
       return <ReportsPanel />;
     case "auditoria":
-      return (
-        <div className="rounded-[16px] border border-line bg-panel p-6">
-          <h2 className="text-lg font-bold text-ink">Auditoria</h2>
-          <p className="mt-2 text-sm text-muted">Log de ações do sistema. Em breve.</p>
-        </div>
-      );
+      return <AuditPanel />;
     default:
       return null;
   }
@@ -78,6 +75,7 @@ function SectionView({ section }: { section: SectionKey }) {
 export default function Home() {
   const hydrated = useHydrated();
   const role = useAppStore((s) => s.role);
+  const authLoading = useAuthStore((s) => s.loading);
   const { section, setSection } = useUIStore();
 
   useEffect(() => {
@@ -86,12 +84,29 @@ export default function Home() {
     }
   }, [role, section, setSection]);
 
-  if (!hydrated) {
+  if (!hydrated || authLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-dark text-muted">
         <div className="flex flex-col items-center gap-3">
           <div className="size-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
           <p className="text-sm">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (role === "tecnico") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-dark px-5">
+        <div className="flex flex-col items-center gap-4 text-center max-w-xs">
+          <div className="size-12 rounded-full bg-teal/10 grid place-items-center">
+            <Smartphone className="size-6 text-teal" />
+          </div>
+          <h2 className="text-lg font-bold text-ink">Acesso pelo App do Técnico</h2>
+          <p className="text-sm text-muted">Sua conta é do tipo técnico. Use o app mobile para acessar suas ordens de serviço.</p>
+          <Link href="/tecnico-mobile" className="inline-flex items-center gap-2 rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-dark transition hover:bg-teal/90">
+            <Smartphone className="size-4" /> Abrir App do Técnico
+          </Link>
         </div>
       </div>
     );

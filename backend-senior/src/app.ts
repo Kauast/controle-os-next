@@ -1,4 +1,4 @@
-import Fastify, { FastifyInstance, FastifyBaseLogger } from 'fastify';
+import Fastify, { FastifyInstance, FastifyBaseLogger, FastifyRequest } from 'fastify';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
@@ -20,7 +20,6 @@ import uploadRoutes from './routes/uploadRoutes';
 import userRoutes from './routes/userRoutes';
 import auditRoutes from './routes/auditRoutes';
 import aiRoutes from './routes/aiRoutes';
-import paymentRoutes from './routes/paymentRoutes';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
 import { config } from './lib/config';
@@ -188,7 +187,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(userRoutes, { prefix: '/api/users' });
   await app.register(auditRoutes, { prefix: '/api/audit' });
   await app.register(aiRoutes, { prefix: '/api/ai' });
-  await app.register(paymentRoutes, { prefix: '/api/payments' });
 
   return app;
 }

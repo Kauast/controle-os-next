@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Clock, ClipboardList, PackageX, Users, Zap } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { access } from "@/lib/access";
@@ -8,33 +9,47 @@ import { useAppStore } from "@/store/use-app-store";
 import { useProducts } from "@/hooks/useProducts";
 import { useTechnicians } from "@/hooks/useTechnicians";
 import { useServiceOrders } from "@/hooks/useServiceOrders";
+import { SERVICE_ORDERS_PAGE_LIMIT } from "@/lib/constants";
+import { apiClient } from "@/lib/api/client";
+
+interface DashboardMetrics {
+  orders: { open: number; inProgress: number; urgent: number; completedToday: number };
+  stock: { critical: number };
+  technicians: { busy: number; available: number; total: number };
+}
 
 export function Metrics() {
   const role = useAppStore((s) => s.role);
 
-  const { data: osData, isLoading: loadingOS } = useServiceOrders({ limit: 300 });
+  const { data: osData, isLoading: loadingOS } = useServiceOrders({ limit: SERVICE_ORDERS_PAGE_LIMIT });
   const apiOrders = osData?.serviceOrders ?? [];
   const { data: products = [] } = useProducts();
   const { data: technicians = [] } = useTechnicians();
 
+  const { data: dashboardData } = useQuery<DashboardMetrics>({
+    queryKey: ["dashboard-metrics"],
+    queryFn: () => apiClient.get<DashboardMetrics>("/reports/dashboard").then((r) => r.data),
+    staleTime: 30_000,
+  });
+
   const today = new Date().toISOString().split("T")[0];
 
-  const abertas       = apiOrders.filter((o) => o.status === "OPEN").length;
-  const emAndamento   = apiOrders.filter((o) => o.status === "IN_PROGRESS" || o.status === "WAITING_PARTS").length;
-  const atrasadas     = apiOrders.filter((o) =>
+  const abertas       = dashboardData?.orders?.open ?? apiOrders.filter((o) => o.status === "OPEN").length;
+  const emAndamento   = dashboardData?.orders?.inProgress ?? apiOrders.filter((o) => o.status === "IN_PROGRESS" || o.status === "WAITING_PARTS").length;
+  const atrasadas     = dashboardData?.orders?.urgent ?? apiOrders.filter((o) =>
     o.priority === "HIGH" && (o.status === "OPEN" || o.status === "IN_PROGRESS")
   ).length;
-  const concluidasHoje = apiOrders.filter((o) =>
+  const concluidasHoje = dashboardData?.orders?.completedToday ?? apiOrders.filter((o) =>
     o.status === "COMPLETED" && (o.checkoutAt ?? "").startsWith(today)
   ).length;
 
-  const disponiveis = TEAMS.filter((team) => {
+  const disponiveis = dashboardData?.technicians?.available ?? TEAMS.filter((team) => {
     const techs = technicians.filter((t) => t.team === team);
     return !techs.some((t) => t.status && t.status !== "Disponivel");
   }).length;
 
   const critico = access.stock(role)
-    ? products.filter((p) => p.qty <= p.min && p.min > 0).length
+    ? (dashboardData?.stock?.critical ?? products.filter((p) => p.qty <= p.min && p.min > 0).length)
     : null;
 
   if (loadingOS) {

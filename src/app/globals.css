@@ -1,42 +1,205 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   GUARDIÃO — DESIGN TOKENS  (Fase 1 · Redesign Técnico em Campo)
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Paleta: Onyx (fundos) + Teal (accent primário) + Amber (logo/destaque)
+   Tema: dark-only, mobile-first, WCAG AA
+
+   ── FUNDO / SUPERFÍCIE ───────────────────────────────────────────────────
+   --color-background   #0B1220   canvas raiz (onyx profundo)
+   --color-surface-0    #0d0d10   splash / modal scrim
+   --color-surface-1    #111827   fundo de seção / layout
+   --color-surface-2    #1A2235   cards de segundo plano
+   --color-surface-3    #1F2937   cards elevados (panel)
+   --color-surface-4    #243044   card ativo / hover state
+
+   ── TEXTO ─────────────────────────────────────────────────────────────────
+   --color-ink          #F0F2F5   texto primário  (contraste ~14:1 vs bg)
+   --color-ink-secondary #C8CDD8  texto secundário (~8:1)
+   --color-muted        #8B95A7   texto de suporte  (~4.6:1 — AA)
+   --color-disabled     #4A5568   texto desabilitado (~2.9:1 — decorativo)
+
+   ── BORDAS ────────────────────────────────────────────────────────────────
+   --color-line         rgba(255,255,255,0.08)  borda sutil padrão
+   --color-line-strong  rgba(255,255,255,0.14)  borda de foco/hover
+   --color-line-active  rgba(255,255,255,0.22)  borda selected/pressed
+
+   ── ACCENT — TEAL (ação primária, sucesso, online) ───────────────────────
+   --color-teal         #14B8A6   base  (contraste 4.6:1 vs surface-3)
+   --color-teal-bright  #2DD4BF   hover/active (contraste 6.1:1)
+   --color-teal-soft    rgba(20,184,166,0.12)   fill suave
+   --color-teal-medium  rgba(20,184,166,0.20)   fill médio (checklist done)
+   --color-teal-border  rgba(20,184,166,0.30)   borda accent
+
+   ── AMBER (logo Guardião, prioridade, atenção) ────────────────────────────
+   --color-amber        #F59E0B   base
+   --color-amber-bright #FBB924   hover/active
+   --color-amber-soft   rgba(245,158,11,0.12)
+   --color-amber-medium rgba(245,158,11,0.20)
+   --color-amber-border rgba(245,158,11,0.30)
+
+   ── RED (erro, crítico, offline) ─────────────────────────────────────────
+   --color-red          #EF4444
+   --color-red-bright   #F87171
+   --color-red-soft     rgba(239,68,68,0.12)
+   --color-red-medium   rgba(239,68,68,0.20)
+   --color-red-border   rgba(239,68,68,0.30)
+
+   ── SUCCESS (OS concluída, check-in feito) ───────────────────────────────
+   --color-success      #22C55E
+   --color-success-soft rgba(34,197,94,0.12)
+   --color-success-border rgba(34,197,94,0.30)
+
+   ── ORANGE (aguardando peças) ─────────────────────────────────────────────
+   --color-orange       #F97316
+   --color-orange-soft  rgba(249,115,22,0.12)
+   --color-orange-border rgba(249,115,22,0.30)
+
+   ── BLUE (OS aberta / pendente) ──────────────────────────────────────────
+   --color-blue         #3B82F6
+   --color-blue-soft    rgba(59,130,246,0.12)
+   --color-blue-border  rgba(59,130,246,0.30)
+
+   ── TIPOGRAFIA ────────────────────────────────────────────────────────────
+   Escala mobile (base 16 px, leitura ao ar livre):
+   --text-xs     11px / 1.45  eyebrow, carimbo de data, badge
+   --text-sm     13px / 1.5   corpo auxiliar, labels
+   --text-base   15px / 1.55  corpo principal, descrição de OS
+   --text-lg     17px / 1.45  subtítulo, nome do cliente
+   --text-xl     20px / 1.3   título de seção
+   --text-2xl    24px / 1.2   título de tela
+   --text-3xl    30px / 1.15  número estatístico grande
+   (Tailwind v4 usa valores rem; mantidos aqui como referência visual)
+
+   ── ESPAÇAMENTO TOQUE ─────────────────────────────────────────────────────
+   --touch-sm   40px   mínimo absoluto (ícone contextual)
+   --touch-md   44px   alvo padrão WCAG 2.5.5
+   --touch-lg   52px   botão primário / CTA
+   --touch-xl   56px   botão de ação principal full-width
+
+   ── RAIOS ─────────────────────────────────────────────────────────────────
+   --radius-xs   8px   badge, tag, pill
+   --radius-sm   12px  input, botão small, chip
+   --radius-md   16px  card padrão
+   --radius-lg   20px  card principal, modal bottom-sheet
+   --radius-xl   24px  card hero, drawer
+
+   ── SOMBRA / ELEVAÇÃO (dark) ─────────────────────────────────────────────
+   --shadow-sm      0 1px 3px rgba(0,0,0,0.40)
+   --shadow-panel   0 4px 24px rgba(0,0,0,0.55)
+   --shadow-float   0 8px 32px rgba(0,0,0,0.65)
+   --shadow-modal   0 16px 48px rgba(0,0,0,0.75)
+   --shadow-glow-teal  0 0 0 3px rgba(20,184,166,0.25)
+   --shadow-glow-amber 0 0 0 3px rgba(245,158,11,0.25)
+
+   ── TRANSIÇÕES ────────────────────────────────────────────────────────────
+   --ease-spring    cubic-bezier(0.34,1.56,0.64,1)  micro-interação toque
+   --ease-out-expo  cubic-bezier(0.16,1,0.3,1)      entrada de painel
+   --ease-in-expo   cubic-bezier(0.7,0,0.84,0)      saída de painel
+   --duration-fast  120ms
+   --duration-base  200ms
+   --duration-slow  320ms
+
+   ══════════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  --color-ink: #f0f2f5;
-  --color-muted: #94A3B8;
+  /* ── Legados mantidos para compatibilidade com componentes existentes ── */
+  --color-ink: #F0F2F5;
+  --color-muted: #8B95A7;
   --color-line: rgba(255,255,255,0.08);
   --color-panel: #1F2937;
   --color-panel-soft: #111827;
   --color-dark: #0B1220;
   --color-silver: #64748B;
   --color-onyx: #0B1220;
-
-  --color-teal: #14B8A6;
-  --color-teal-soft: rgba(20,184,166,0.12);
-  --color-amber: #F59E0B;
-  --color-amber-soft: rgba(245,158,11,0.12);
-  --color-red: #EF4444;
-  --color-red-soft: rgba(239,68,68,0.12);
-  --color-success: #22C55E;
-  --color-success-soft: rgba(34,197,94,0.12);
-
   --color-background: #0B1220;
-  --color-foreground: #f0f2f5;
+  --color-foreground: #F0F2F5;
   --color-border: rgba(255,255,255,0.08);
   --color-card: #1F2937;
-  --color-muted-foreground: #94A3B8;
+  --color-muted-foreground: #8B95A7;
   --color-status-critical: #EF4444;
   --color-ring: #14B8A6;
 
-  --radius-lg: 20px;
-  --radius-md: 16px;
+  /* ── Superfícies ── */
+  --color-surface-0: #0d0d10;
+  --color-surface-1: #111827;
+  --color-surface-2: #1A2235;
+  --color-surface-3: #1F2937;
+  --color-surface-4: #243044;
+
+  /* ── Texto ── */
+  --color-ink-secondary: #C8CDD8;
+  --color-disabled: #4A5568;
+
+  /* ── Bordas ── */
+  --color-line-strong: rgba(255,255,255,0.14);
+  --color-line-active: rgba(255,255,255,0.22);
+
+  /* ── Teal ── */
+  --color-teal: #14B8A6;
+  --color-teal-bright: #2DD4BF;
+  --color-teal-soft: rgba(20,184,166,0.12);
+  --color-teal-medium: rgba(20,184,166,0.20);
+  --color-teal-border: rgba(20,184,166,0.30);
+
+  /* ── Amber ── */
+  --color-amber: #F59E0B;
+  --color-amber-bright: #FBB924;
+  --color-amber-soft: rgba(245,158,11,0.12);
+  --color-amber-medium: rgba(245,158,11,0.20);
+  --color-amber-border: rgba(245,158,11,0.30);
+
+  /* ── Red ── */
+  --color-red: #EF4444;
+  --color-red-bright: #F87171;
+  --color-red-soft: rgba(239,68,68,0.12);
+  --color-red-medium: rgba(239,68,68,0.20);
+  --color-red-border: rgba(239,68,68,0.30);
+
+  /* ── Success ── */
+  --color-success: #22C55E;
+  --color-success-soft: rgba(34,197,94,0.12);
+  --color-success-border: rgba(34,197,94,0.30);
+
+  /* ── Orange ── */
+  --color-orange: #F97316;
+  --color-orange-soft: rgba(249,115,22,0.12);
+  --color-orange-border: rgba(249,115,22,0.30);
+
+  /* ── Blue ── */
+  --color-blue: #3B82F6;
+  --color-blue-soft: rgba(59,130,246,0.12);
+  --color-blue-border: rgba(59,130,246,0.30);
+
+  /* ── Raios ── */
+  --radius-xs: 8px;
   --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
 
+  /* ── Sombras ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.40);
+  --shadow-panel: 0 4px 24px rgba(0,0,0,0.55);
+  --shadow-float: 0 8px 32px rgba(0,0,0,0.65);
+  --shadow-modal: 0 16px 48px rgba(0,0,0,0.75);
+  --shadow-glow-teal: 0 0 0 3px rgba(20,184,166,0.25);
+  --shadow-glow-amber: 0 0 0 3px rgba(245,158,11,0.25);
+
+  /* ── Touch targets ── */
+  --touch-sm: 40px;
+  --touch-md: 44px;
+  --touch-lg: 52px;
+  --touch-xl: 56px;
+
+  /* ── Tipografia ── */
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-
-  --shadow-panel: 0 4px 24px rgba(0,0,0,0.5);
 }
 
+/* ── Reset base ────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
 }
@@ -53,32 +216,135 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Scrollbar sutil ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.12);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.22);
 }
 
+/* ── Utilities ─────────────────────────────────────────────────────────── */
 @layer utilities {
+  /* Esconde scrollbar mantendo scroll */
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  /* Eyebrow / label de seção */
   .label-eyebrow {
-    font-size: 0.6875rem;
+    font-size: 0.6875rem;       /* 11px */
     font-weight: 600;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--color-muted);
+  }
+
+  /* Safe-area helpers para Capacitor/Android */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
+  .mt-safe {
+    margin-top: env(safe-area-inset-top);
+  }
+
+  /* Texto truncado com limite de linhas */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Efeito pressed (feedback tátil) */
+  .press-effect {
+    transition: transform 120ms cubic-bezier(0.34,1.56,0.64,1),
+                opacity 120ms ease;
+  }
+  .press-effect:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+
+  /* Brilho de glow teal para botão primário */
+  .glow-teal:focus-visible {
+    box-shadow: var(--shadow-glow-teal);
+  }
+
+  /* Skeleton pulse — mais escuro que padrão para dark */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.05) 25%,
+      rgba(255,255,255,0.10) 50%,
+      rgba(255,255,255,0.05) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Status badge — cor + ícone + texto (uso no fluxo técnico) */
+  .status-open {
+    background: var(--color-blue-soft);
+    color: var(--color-blue);
+    border-color: var(--color-blue-border);
+  }
+  .status-in-progress {
+    background: var(--color-amber-soft);
+    color: var(--color-amber);
+    border-color: var(--color-amber-border);
+  }
+  .status-waiting-parts {
+    background: var(--color-orange-soft);
+    color: var(--color-orange);
+    border-color: var(--color-orange-border);
+  }
+  .status-completed {
+    background: var(--color-teal-soft);
+    color: var(--color-teal);
+    border-color: var(--color-teal-border);
+  }
+  .status-cancelled {
+    background: var(--color-red-soft);
+    color: var(--color-red);
+    border-color: var(--color-red-border);
+  }
+
+  /* Indicador offline — banner full-width */
+  .offline-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--color-red-soft);
+    border-bottom: 1px solid var(--color-red-border);
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;  /* 13px */
+    color: var(--color-red-bright);
+    font-weight: 500;
   }
 }

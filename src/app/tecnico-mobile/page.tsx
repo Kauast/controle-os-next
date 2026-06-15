@@ -1,24 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   BadgeCheck,
   Camera,
   CheckCircle2,
+  Circle,
+  ClipboardList,
   Clock,
   LogOut,
   MapPin,
+  Package,
   Phone,
   RefreshCw,
+  User,
   Wifi,
   WifiOff,
+  Wrench,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatCard } from "@/components/ui/stat-card";
 import { SignaturePad } from "@/components/tecnico/signature-pad";
 import { cn } from "@/lib/utils";
 import { capturePhoto } from "@/lib/mobile/camera";
@@ -44,20 +55,34 @@ import {
 // ─── Foto state ───────────────────────────────────────────────────────────────
 
 interface PhotoSlotState {
+  /** dataUrl local para preview imediato (nao e enviado ao servidor). */
   preview: string | null;
-  url: string | null;
+  /** attachmentId retornado pelo backend apos upload bem-sucedido. */
+  attachmentId: string | null;
   uploading: boolean;
   error: boolean;
 }
 
-const EMPTY_PHOTO: PhotoSlotState = { preview: null, url: null, uploading: false, error: false };
+const EMPTY_PHOTO: PhotoSlotState = {
+  preview: null,
+  attachmentId: null,
+  uploading: false,
+  error: false,
+};
 
-const STATUS_LABEL: Record<MobileServiceOrder["status"], { text: string; cls: string }> = {
-  OPEN: { text: "Aberta", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  IN_PROGRESS: { text: "Em andamento", cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-  WAITING_PARTS: { text: "Aguardando peças", cls: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
-  COMPLETED: { text: "Concluída", cls: "bg-teal-500/20 text-teal-400 border-teal-500/30" },
-  CANCELLED: { text: "Cancelada", cls: "bg-red-500/20 text-red-400 border-red-500/30" },
+// ─── Status config (Badge + ícone lucide) ────────────────────────────────────
+
+type BadgeTone = "blue" | "amber" | "orange" | "teal" | "red";
+
+const STATUS_CONFIG: Record<
+  MobileServiceOrder["status"],
+  { text: string; tone: BadgeTone; icon: React.ReactNode }
+> = {
+  OPEN:          { text: "Aberta",           tone: "blue",   icon: <Clock /> },
+  IN_PROGRESS:   { text: "Em andamento",     tone: "amber",  icon: <Wrench /> },
+  WAITING_PARTS: { text: "Aguardando peças", tone: "orange", icon: <Package /> },
+  COMPLETED:     { text: "Concluída",        tone: "teal",   icon: <CheckCircle2 /> },
+  CANCELLED:     { text: "Cancelada",        tone: "red",    icon: <XCircle /> },
 };
 
 const PRIORITY_LABEL: Record<MobileServiceOrder["priority"], string> = {
@@ -67,10 +92,20 @@ const PRIORITY_LABEL: Record<MobileServiceOrder["priority"], string> = {
   CRITICAL: "Crítica",
 };
 
+type PriorityBadgeTone = "amber" | "orange" | "red";
+const PRIORITY_BADGE: Record<
+  Exclude<MobileServiceOrder["priority"], "NORMAL">,
+  { tone: PriorityBadgeTone; label: string }
+> = {
+  WARNING:  { tone: "amber",  label: "Atenção" },
+  HIGH:     { tone: "orange", label: "Alta" },
+  CRITICAL: { tone: "red",    label: "Crítica" },
+};
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-lg bg-white/8", className)} />;
+  return <div className={cn("skeleton rounded-[var(--radius-md)]", className)} />;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -136,9 +171,7 @@ export default function TecnicoMobilePage() {
 
   // OS activa: a primeira não finalizada/cancelada
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
-  const activeOrder =
-    orders.find((o) => o.id === activeOrderId) ??
-    orders.find((o) => o.status === "IN_PROGRESS" || o.status === "OPEN");
+  const activeOrder = orders.find((o) => o.id === activeOrderId) ?? null;
 
   // ─── Execution state ────────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<[PhotoSlotState, PhotoSlotState, PhotoSlotState]>([
@@ -148,9 +181,10 @@ export default function TecnicoMobilePage() {
   ]);
   const [signature, setSignature] = useState<{
     preview: string | null;
-    url: string | null;
+    /** attachmentId retornado pelo backend apos upload da assinatura. */
+    attachmentId: string | null;
     uploading: boolean;
-  }>({ preview: null, url: null, uploading: false });
+  }>({ preview: null, attachmentId: null, uploading: false });
   const [chipDraft, setChipDraft] = useState("");
   const [chipConfirmed, setChipConfirmed] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
@@ -168,44 +202,117 @@ export default function TecnicoMobilePage() {
       setChipConfirmed(null);
       setChipDraft("");
     }
-    // Reconstrói fotos a partir das URLs salvas
-    if (exec?.photoUrls?.length) {
-      setPhotos((prev) =>
-        prev.map((p, i) => {
-          const savedUrl = exec.photoUrls![i];
-          return savedUrl ? { ...EMPTY_PHOTO, url: savedUrl, preview: savedUrl } : p;
-        }) as [PhotoSlotState, PhotoSlotState, PhotoSlotState]
+    // Reconstroi fotos a partir dos attachmentIds salvos no backend
+    const savedIds = exec?.photoAttachmentIds ?? [];
+    if (savedIds.length) {
+      setPhotos(
+        savedIds.slice(0, 3).concat(Array(3).fill(null)).slice(0, 3).map((id: string | null) =>
+          id ? { ...EMPTY_PHOTO, attachmentId: id, preview: null } : EMPTY_PHOTO
+        ) as [PhotoSlotState, PhotoSlotState, PhotoSlotState]
       );
     } else {
       setPhotos([EMPTY_PHOTO, EMPTY_PHOTO, EMPTY_PHOTO]);
     }
-    if (exec?.clientSignature) {
-      setSignature({ preview: exec.clientSignature, url: exec.clientSignature, uploading: false });
+    if (exec?.signatureAttachmentId) {
+      setSignature({ preview: null, attachmentId: exec.signatureAttachmentId, uploading: false });
     } else {
-      setSignature({ preview: null, url: null, uploading: false });
+      setSignature({ preview: null, attachmentId: null, uploading: false });
     }
   }, [activeOrder?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Chaves estáveis para disparar o efeito de preview apenas quando os IDs mudam
+  const photoAttachmentKey = useMemo(
+    () => photos.map((p) => p.attachmentId ?? "").join(","),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [photos[0].attachmentId, photos[1].attachmentId, photos[2].attachmentId]
+  );
+  const signatureAttachmentId = signature.attachmentId;
+
+  // Carrega previews para attachmentIds sem preview (após reload)
+  useEffect(() => {
+    // Object URLs criadas neste efeito — precisam ser revogadas no cleanup
+    const objectUrls: string[] = [];
+
+    const loadPhotoPreview = async (id: string, idx: number) => {
+      try {
+        const res = await mobileApiClient.get<Blob>(`/attachments/${id}/download`, {
+          responseType: "blob",
+        });
+        const url = URL.createObjectURL(res.data);
+        objectUrls.push(url);
+        setPhotos((prev) => {
+          const next = [...prev] as typeof prev;
+          // Só aplica se o slot ainda tem o mesmo attachmentId e preview ainda nulo
+          if (next[idx].attachmentId === id && next[idx].preview === null) {
+            next[idx] = { ...next[idx], preview: url };
+          }
+          return next;
+        });
+      } catch {
+        // Falha silenciosa: mantém o badge de "enviado" (checkmark) sem preview
+      }
+    };
+
+    const loadSignaturePreview = async (id: string) => {
+      try {
+        const res = await mobileApiClient.get<Blob>(`/attachments/${id}/download`, {
+          responseType: "blob",
+        });
+        const url = URL.createObjectURL(res.data);
+        objectUrls.push(url);
+        setSignature((prev) => {
+          if (prev.attachmentId === id && prev.preview === null) {
+            return { ...prev, preview: url };
+          }
+          return prev;
+        });
+      } catch {
+        // Falha silenciosa: mantém o estado de "assinatura enviada"
+      }
+    };
+
+    photos.forEach((p, idx) => {
+      if (p.attachmentId && p.preview === null) {
+        void loadPhotoPreview(p.attachmentId, idx);
+      }
+    });
+
+    if (signatureAttachmentId && signature.preview === null) {
+      void loadSignaturePreview(signatureAttachmentId);
+    }
+
+    return () => {
+      // Revoga todas as object URLs criadas para evitar vazamento de memória
+      for (const url of objectUrls) {
+        URL.revokeObjectURL(url);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoAttachmentKey, signatureAttachmentId]);
 
   const checkin = useCheckin(activeOrder?.id ?? "");
   const updateExecution = useUpdateExecution(activeOrder?.id ?? "");
   const completeOS = useCompleteOS(activeOrder?.id ?? "");
 
   // ─── Checklist ──────────────────────────────────────────────────────────────
-  const photoCount = photos.filter((p) => p.url || p.preview).length;
-  const chipOk = !!chipConfirmed && chipConfirmed.replace(/\D/g, "").length >= 5;
-  const hasSignature = !!signature.url || !!signature.preview;
+  const photoCount = photos.filter((p) => p.attachmentId ?? p.preview).length;
+  const chipOk = !!chipConfirmed && chipConfirmed.replace(/\D/g, "").length >= 18;
+  const hasSignature = !!(signature.attachmentId ?? signature.preview);
   const isCompleted = activeOrder?.status === "COMPLETED";
 
   const requirements = [
-    { key: "checkin", label: "Check-in", done: checkedIn },
-    { key: "photos", label: "3 fotos", done: photoCount >= 3 },
+    { key: "checkin",   label: "Check-in",   done: checkedIn },
+    { key: "photos",    label: "3 fotos",    done: photoCount >= 3 },
     { key: "signature", label: "Assinatura", done: hasSignature },
-    { key: "chip", label: "ID do chip", done: chipOk },
+    { key: "chip",      label: "ID do chip", done: chipOk },
   ];
   const canFinish =
     requirements.every((r) => r.done) &&
     !isCompleted &&
     activeOrder?.status !== "CANCELLED";
+
+  const doneCount = requirements.filter((r) => r.done).length;
+  const progressPct = Math.round((doneCount / requirements.length) * 100);
 
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
@@ -245,21 +352,27 @@ export default function TecnicoMobilePage() {
       // Preview imediato
       setPhotos((prev) => {
         const next = [...prev] as typeof prev;
-        next[slotIndex] = { preview: result.dataUrl, url: null, uploading: true, error: false };
+        next[slotIndex] = { preview: result.dataUrl, attachmentId: null, uploading: true, error: false };
         return next;
       });
-      // Upload
-      const url = await uploadPhotoBlob(result.blob, result.filename);
+      // Upload — retorna attachmentId (sem URL publica)
+      const attachmentId = await uploadPhotoBlob(result.blob, result.filename);
       setPhotos((prev) => {
         const next = [...prev] as typeof prev;
-        next[slotIndex] = { preview: url, url, uploading: false, error: false };
+        // Mantem o dataUrl local como preview; registra o attachmentId
+        next[slotIndex] = {
+          preview: result.dataUrl,
+          attachmentId,
+          uploading: false,
+          error: false,
+        };
         return next;
       });
-      // Salva URLs no backend
-      const urls = [...photos].map((p, i) =>
-        i === slotIndex ? url : p.url ?? p.preview ?? ""
+      // Persiste os IDs dos anexos no backend
+      const ids = [...photos].map((p, i) =>
+        i === slotIndex ? attachmentId : (p.attachmentId ?? "")
       );
-      await updateExecution.mutateAsync({ photoUrls: urls.filter(Boolean) });
+      await updateExecution.mutateAsync({ photoAttachmentIds: ids.filter(Boolean) });
     } catch (err) {
       if (err instanceof Error && err.message === "Foto cancelada") return;
       setPhotos((prev) => {
@@ -267,25 +380,26 @@ export default function TecnicoMobilePage() {
         next[slotIndex] = { ...next[slotIndex], uploading: false, error: true };
         return next;
       });
-      toast.error("Erro ao enviar foto. Toque para tentar novamente.");
+      toast.error("Erro ao enviar foto. Toque no slot para tentar novamente.", { duration: 4000 });
     }
   }
 
   async function handleSignatureConfirm(dataUrl: string) {
     if (!activeOrder) return;
-    setSignature({ preview: dataUrl, url: null, uploading: true });
+    setSignature({ preview: dataUrl, attachmentId: null, uploading: true });
     try {
-      const url = await uploadSignatureDataUrl(dataUrl, activeOrder.id);
-      setSignature({ preview: url, url, uploading: false });
-      await updateExecution.mutateAsync({ clientSignature: url });
+      const attachmentId = await uploadSignatureDataUrl(dataUrl, activeOrder.id);
+      // Mantem o dataUrl como preview local; registra o attachmentId
+      setSignature({ preview: dataUrl, attachmentId, uploading: false });
+      await updateExecution.mutateAsync({ signatureAttachmentId: attachmentId });
     } catch {
-      setSignature({ preview: dataUrl, url: null, uploading: false });
+      setSignature({ preview: dataUrl, attachmentId: null, uploading: false });
       toast.error("Erro ao salvar assinatura.");
     }
   }
 
   function handleSignatureClear() {
-    setSignature({ preview: null, url: null, uploading: false });
+    setSignature({ preview: null, attachmentId: null, uploading: false });
   }
 
   async function handleChipConfirm() {
@@ -309,15 +423,19 @@ export default function TecnicoMobilePage() {
         checkoutLat: geo?.latitude,
         checkoutLng: geo?.longitude,
       });
-      toast.success("OS finalizada com sucesso!");
+      toast.success("OS finalizada com sucesso!", { duration: 4000 });
       // Limpa estado local
       setPhotos([EMPTY_PHOTO, EMPTY_PHOTO, EMPTY_PHOTO]);
-      setSignature({ preview: null, url: null, uploading: false });
+      setSignature({ preview: null, attachmentId: null, uploading: false });
       setChipConfirmed(null);
       setChipDraft("");
       setCheckedIn(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao finalizar OS";
+      const axiosMsg =
+        (err as { response?: { data?: { error?: string; message?: string } } })?.response?.data
+          ?.error ??
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const msg = axiosMsg ?? (err instanceof Error ? err.message : "Erro ao finalizar OS");
       toast.error(msg);
     }
   }
@@ -328,23 +446,51 @@ export default function TecnicoMobilePage() {
     setIsPulling(false);
   }
 
-  // ─── Loading ─────────────────────────────────────────────────────────────────
+  // ─── Sync manual (header) ────────────────────────────────────────────────────
+  function handleManualSync() {
+    if (!isOnline) {
+      toast.error("Sem conexão. Aguardando rede.");
+      return;
+    }
+    setIsSyncing(true);
+    syncQueue(mobileApiClient)
+      .then(({ synced, failed }) => {
+        clearDoneItems();
+        setPendingSync(getPendingCount());
+        if (synced > 0) toast.success(`${synced} sincronizadas.`);
+        if (failed > 0) toast.error(`${failed} falharam.`);
+      })
+      .finally(() => setIsSyncing(false));
+  }
+
+  // ─── Loading skeleton ────────────────────────────────────────────────────────
 
   if (authed === null || meLoading) {
     return (
-      <div className="min-h-[100dvh] bg-[#0d0d0d] flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
-          <Skeleton className="size-9 rounded-xl" />
+      <div
+        className="min-h-[100dvh] flex flex-col"
+        style={{
+          background: "var(--color-surface-0)",
+          paddingTop: "env(safe-area-inset-top)",
+        }}
+      >
+        {/* Header skeleton */}
+        <div
+          className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{ borderColor: "var(--color-line)" }}
+        >
+          <Skeleton className="size-9 rounded-[var(--radius-sm)]" />
           <div className="flex-1 space-y-1.5">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-4 w-32" />
           </div>
         </div>
+        {/* Stats skeleton */}
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-16" />)}
+          <div className="grid grid-cols-3 gap-2">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[68px]" />)}
           </div>
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}
+          {[1, 2].map((i) => <Skeleton key={i} className="h-[88px]" />)}
         </div>
       </div>
     );
@@ -357,6 +503,10 @@ export default function TecnicoMobilePage() {
   const pendingOrders = orders.filter((o) => o.status === "OPEN" || o.status === "IN_PROGRESS").length;
   const completedOrders = orders.filter((o) => o.status === "COMPLETED").length;
 
+  // Avatar inicial do nome
+  const techName = me?.name ?? me?.email ?? "Técnico";
+  const avatarInitial = techName.charAt(0).toUpperCase();
+
   // ─── Client address for maps ─────────────────────────────────────────────────
   const clientAddress = activeOrder?.client
     ? [activeOrder.client.address, activeOrder.client.city, activeOrder.client.state]
@@ -368,39 +518,68 @@ export default function TecnicoMobilePage() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-[100dvh] bg-[#0d0d0d]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-      {/* Header */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#0d0d0d]/95 px-4 py-3 backdrop-blur-md" style={{ paddingTop: "max(12px, calc(env(safe-area-inset-top) + 4px))" }}>
-        <div className="flex-1 leading-tight min-w-0">
-          <span className="block text-[11px] text-white/40">
-            {me?.name ?? me?.email ?? "Técnico"}
-          </span>
-          <strong className="block text-sm text-white truncate">Minhas OS</strong>
+    <div
+      className="min-h-[100dvh]"
+      style={{
+        background: "var(--color-surface-0)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header
+        className="sticky top-0 z-30 flex items-center gap-3 border-b backdrop-blur-md px-4 pb-3"
+        style={{
+          background: "color-mix(in srgb, var(--color-surface-0) 95%, transparent)",
+          borderColor: "var(--color-line)",
+          paddingTop: "max(12px, calc(env(safe-area-inset-top) + 4px))",
+        }}
+      >
+        {/* Avatar de inicial */}
+        <div
+          className="size-9 shrink-0 flex items-center justify-center rounded-[var(--radius-sm)] border"
+          style={{
+            background: "var(--color-teal-soft)",
+            borderColor: "var(--color-teal-border)",
+          }}
+          aria-hidden="true"
+        >
+          {avatarInitial ? (
+            <span className="text-[13px] font-bold" style={{ color: "var(--color-teal)" }}>
+              {avatarInitial}
+            </span>
+          ) : (
+            <User className="size-4" style={{ color: "var(--color-teal)" }} />
+          )}
         </div>
 
-        {/* Status de rede */}
+        {/* Nome e subtítulo */}
+        <div className="flex-1 leading-tight min-w-0">
+          <span className="block text-[11px] truncate" style={{ color: "var(--color-muted)" }}>
+            {techName}
+          </span>
+          <strong className="block text-sm truncate" style={{ color: "var(--color-ink)" }}>
+            Minhas OS
+          </strong>
+        </div>
+
+        {/* Ícone de rede */}
         {isOnline ? (
-          <Wifi className="size-4 text-teal-400 shrink-0" />
+          <Wifi className="size-[18px] shrink-0" style={{ color: "var(--color-teal)" }} />
         ) : (
-          <WifiOff className="size-4 text-red-400 shrink-0" />
+          <WifiOff className="size-[18px] shrink-0" style={{ color: "var(--color-red-bright)" }} />
         )}
 
-        {/* Contador de sync pendente */}
+        {/* Badge de sync pendente */}
         {pendingSync > 0 && (
           <button
-            onClick={() => {
-              if (!isOnline) { toast.error("Sem conexão. Aguardando rede."); return; }
-              setIsSyncing(true);
-              syncQueue(mobileApiClient)
-                .then(({ synced, failed }) => {
-                  clearDoneItems();
-                  setPendingSync(getPendingCount());
-                  if (synced > 0) toast.success(`${synced} sincronizadas.`);
-                  if (failed > 0) toast.error(`${failed} falharam.`);
-                })
-                .finally(() => setIsSyncing(false));
+            onClick={handleManualSync}
+            className="flex items-center gap-1 rounded-[var(--radius-xs)] border px-2.5 py-1 text-[11px] font-semibold min-h-[32px] min-w-[40px]"
+            style={{
+              background: "var(--color-amber-soft)",
+              borderColor: "var(--color-amber-border)",
+              color: "var(--color-amber)",
             }}
-            className="relative flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-400"
+            aria-label={`${pendingSync} ações pendentes de sincronização`}
           >
             {isSyncing ? (
               <RefreshCw className="size-3 animate-spin" />
@@ -411,112 +590,210 @@ export default function TecnicoMobilePage() {
           </button>
         )}
 
+        {/* Botão logout */}
         <Button
-          variant="secondary"
+          variant="icon"
           size="icon"
-          className="size-9 shrink-0"
+          className="shrink-0"
           onClick={handleLogout}
+          aria-label="Sair"
           title="Sair"
         >
           <LogOut className="size-4" />
         </Button>
       </header>
 
-      {/* Offline banner */}
+      {/* ── Banner offline ──────────────────────────────────────────────────── */}
       <AnimatePresence>
         {!isOnline && (
           <motion.div
+            key="offline-banner"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="overflow-hidden"
           >
-            <div className="flex items-center gap-2 bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-400">
-              <WifiOff className="size-3.5 shrink-0" />
-              Sem conexão — ações ficam salvas e sincronizam automaticamente.
+            <div
+              className="offline-banner"
+              role="status"
+              aria-live="polite"
+            >
+              <WifiOff className="size-4 shrink-0" />
+              Sem conexão — ações ficam salvas localmente.
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="flex flex-col gap-4 px-4 py-4">
-        {/* Pull to refresh */}
-        <button
-          onClick={handlePullRefresh}
-          disabled={ordersLoading || isPulling}
-          className="mx-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/50 active:bg-white/10 disabled:opacity-40"
-        >
-          <RefreshCw className={cn("size-3", (ordersLoading || isPulling) && "animate-spin")} />
-          Atualizar
-        </button>
 
-        {/* Stats grid */}
-        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[
-            { label: "OS hoje", value: todayOrders },
-            { label: "Pendentes", value: pendingOrders },
-            { label: "Concluídas", value: completedOrders },
-            { label: "Status", value: isOnline ? "Online" : "Offline" },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl border border-white/10 bg-white/5 p-3 text-center"
-            >
-              <strong className="block text-lg text-white">{s.value}</strong>
-              <span className="text-[10px] text-white/40">{s.label}</span>
-            </div>
-          ))}
+        {/* ── Seção HOJE + Atualizar ──────────────────────────────────────── */}
+        <div className="flex items-center justify-between">
+          <span className="label-eyebrow">Hoje</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handlePullRefresh}
+            disabled={ordersLoading || isPulling}
+            className="text-[12px]"
+            aria-label="Atualizar lista de OS"
+          >
+            <RefreshCw
+              className={cn("size-3.5", (ordersLoading || isPulling) && "animate-spin")}
+            />
+            Atualizar
+          </Button>
+        </div>
+
+        {/* ── Stats grid (3 colunas) ──────────────────────────────────────── */}
+        <section aria-label="Resumo do dia" className="grid grid-cols-3 gap-2">
+          <StatCard
+            label="Total"
+            value={todayOrders}
+            index={0}
+          />
+          <StatCard
+            label="Pendentes"
+            value={pendingOrders}
+            warn={pendingOrders > 0}
+            index={1}
+          />
+          <StatCard
+            label="Feitas"
+            value={completedOrders}
+            success={completedOrders > 0 && completedOrders === todayOrders}
+            index={2}
+          />
         </section>
 
-        {/* OS List */}
-        <section className="flex flex-col gap-2">
-          <strong className="text-sm text-white/80">Ordens de serviço</strong>
+        {/* ── Lista de OS ─────────────────────────────────────────────────── */}
+        <section aria-label="Ordens de serviço" className="flex flex-col gap-2">
+          <span className="label-eyebrow">Ordens de serviço</span>
 
           {ordersLoading ? (
-            [1, 2].map((i) => <Skeleton key={i} className="h-20" />)
+            <>
+              <Skeleton className="h-[88px]" />
+              <Skeleton className="h-[88px]" />
+            </>
           ) : orders.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-white/5 py-8 text-center text-sm text-white/40">
-              Nenhuma OS atribuída a você.
-            </div>
+            <EmptyState
+              tone="neutral"
+              icon={<ClipboardList />}
+              title="Nenhuma OS atribuída hoje"
+              description="Aguarde a atribuição pelo supervisor"
+              action={
+                <Button variant="ghost" size="sm" onClick={handlePullRefresh}>
+                  Atualizar lista
+                </Button>
+              }
+            />
           ) : (
-            orders.map((o) => {
-              const sl = STATUS_LABEL[o.status];
+            orders.map((o, idx) => {
+              const cfg = STATUS_CONFIG[o.status];
               const isActive = o.id === (activeOrder?.id ?? "");
+              const createdAt = o.openingDate
+                ? new Date(o.openingDate).toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : null;
+              const address = o.client
+                ? [o.client.address, o.client.city].filter(Boolean).join(", ")
+                : null;
+
               return (
-                <button
+                <motion.button
                   key={o.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05, duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                   onClick={() => setActiveOrderId(o.id)}
                   className={cn(
-                    "w-full rounded-xl border p-3 text-left transition-all active:scale-[0.99]",
+                    "w-full text-left p-4 transition-all duration-[200ms]",
+                    "rounded-[var(--radius-md)] border",
+                    "active:scale-[0.99]",
                     isActive
-                      ? "border-amber-500/40 bg-amber-500/10"
-                      : "border-white/10 bg-white/5"
+                      ? "border-l-2 border-l-[var(--color-amber)] border-[var(--color-amber-border)]"
+                      : "border-[var(--color-line)]"
                   )}
+                  style={{
+                    background: isActive
+                      ? "var(--color-amber-soft)"
+                      : "var(--color-surface-2)",
+                  }}
+                  aria-pressed={isActive}
+                  aria-label={`OS #${o.number} — ${o.client.name}`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
-                        sl.cls
-                      )}
-                    >
-                      {sl.text}
+                  {/* Linha topo: badge status + número + prioridade */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge tone={cfg.tone} size="sm">
+                      {cfg.icon}
+                      {cfg.text}
+                    </Badge>
+                    <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                      #{o.number}
                     </span>
-                    <span className="text-[10px] text-white/40">
-                      #{o.number} · {PRIORITY_LABEL[o.priority]}
-                    </span>
+                    {o.priority !== "NORMAL" && (
+                      <Badge tone={PRIORITY_BADGE[o.priority].tone} size="sm">
+                        {PRIORITY_BADGE[o.priority].label}
+                      </Badge>
+                    )}
+                    {o.priority === "NORMAL" && (
+                      <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                        · {PRIORITY_LABEL[o.priority]}
+                      </span>
+                    )}
                   </div>
-                  <strong className="mt-1 block text-sm text-white">{o.client.name}</strong>
+
+                  {/* Nome do cliente */}
+                  <strong
+                    className="mt-1.5 block text-[15px] font-bold"
+                    style={{ color: "var(--color-ink)" }}
+                  >
+                    {o.client.name}
+                  </strong>
+
+                  {/* Descrição */}
                   {o.description && (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-white/50">{o.description}</p>
+                    <p
+                      className="mt-0.5 line-clamp-1 text-[13px]"
+                      style={{ color: "var(--color-muted)" }}
+                    >
+                      {o.description}
+                    </p>
                   )}
-                </button>
+
+                  {/* Metadados: hora + endereço */}
+                  {(createdAt || address) && (
+                    <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+                      {createdAt && (
+                        <span
+                          className="flex items-center gap-1 text-[11px]"
+                          style={{ color: "var(--color-muted)" }}
+                        >
+                          <Clock className="size-3" />
+                          {createdAt}
+                        </span>
+                      )}
+                      {address && (
+                        <span
+                          className="flex items-center gap-1 text-[11px] line-clamp-1 min-w-0"
+                          style={{ color: "var(--color-muted)" }}
+                        >
+                          <MapPin className="size-3 shrink-0" />
+                          <span className="line-clamp-1">{address}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </motion.button>
               );
             })
           )}
         </section>
 
-        {/* Active OS execution panel */}
+        {/* ── Painel de execução da OS ativa ─────────────────────────────── */}
         <AnimatePresence mode="wait">
           {activeOrder && !isCompleted && activeOrder.status !== "CANCELLED" && (
             <motion.div
@@ -524,132 +801,271 @@ export default function TecnicoMobilePage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col gap-3"
             >
-              {/* Client info card */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={cn(
-                      "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
-                      STATUS_LABEL[activeOrder.status].cls
-                    )}
-                  >
-                    {STATUS_LABEL[activeOrder.status].text}
-                  </span>
-                  <span className="text-[10px] text-white/40">
+              {/* ── Card cliente ─────────────────────────────────────────── */}
+              <Card
+                variant="elevated"
+                tone={checkedIn ? "teal" : "default"}
+              >
+                {/* Status badge + número */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Badge tone={STATUS_CONFIG[activeOrder.status].tone} size="md">
+                    {STATUS_CONFIG[activeOrder.status].icon}
+                    {STATUS_CONFIG[activeOrder.status].text}
+                  </Badge>
+                  <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
                     OS #{activeOrder.number}
                   </span>
                 </div>
-                <h2 className="text-base font-bold text-white">{activeOrder.client.name}</h2>
+
+                {/* Nome do cliente */}
+                <h2
+                  className="font-bold leading-snug"
+                  style={{ fontSize: "17px", color: "var(--color-ink)" }}
+                >
+                  {activeOrder.client.name}
+                </h2>
+
+                {/* Descrição */}
                 {activeOrder.description && (
-                  <p className="mt-0.5 text-sm text-white/60">{activeOrder.description}</p>
-                )}
-                {clientAddress && (
-                  <p className="mt-1 text-xs text-white/40">{clientAddress}</p>
+                  <p
+                    className="mt-1 text-[13px] line-clamp-2"
+                    style={{ color: "var(--color-muted)" }}
+                  >
+                    {activeOrder.description}
+                  </p>
                 )}
 
-                <div className="mt-3 flex gap-2">
+                {/* Endereço */}
+                {clientAddress && (
+                  <p className="mt-1 text-[11px]" style={{ color: "var(--color-muted)" }}>
+                    {clientAddress}
+                  </p>
+                )}
+
+                {/* Botões rápidos: Ligar + Rota */}
+                <div className="grid grid-cols-2 gap-2 mt-3">
                   {activeOrder.client.phone && (
-                    <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" asChild>
+                    <Button variant="secondary" size="default" asChild>
                       <a href={`tel:${activeOrder.client.phone}`}>
                         <Phone className="size-4" /> Ligar
                       </a>
                     </Button>
                   )}
-                  <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" asChild>
+                  <Button variant="secondary" size="default" asChild>
                     <a href={mapsUrl} target="_blank" rel="noreferrer">
                       <MapPin className="size-4" /> Rota
                     </a>
                   </Button>
                 </div>
 
-                <Button
-                  className="mt-3 w-full min-h-[48px]"
-                  disabled={checkedIn || checkingIn}
-                  onClick={handleCheckin}
-                >
-                  {checkingIn
-                    ? "Aguardando GPS..."
-                    : checkedIn
-                    ? "✓ Check-in realizado"
-                    : "Iniciar atendimento"}
-                </Button>
-              </div>
-
-              {/* Checklist + execução */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <strong className="text-sm text-white/80">Conclusão da OS</strong>
-                  <span
-                    className={cn(
-                      "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
-                      canFinish
-                        ? "border-teal-500/30 bg-teal-500/15 text-teal-400"
-                        : "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                    )}
+                {/* Botão check-in */}
+                {checkedIn ? (
+                  <Button
+                    variant="outline"
+                    size="xl"
+                    className="w-full mt-3"
+                    disabled
+                    aria-disabled="true"
                   >
+                    <CheckCircle2 className="size-5" style={{ color: "var(--color-teal)" }} />
+                    Check-in realizado
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="xl"
+                    className="w-full mt-3"
+                    isLoading={checkingIn}
+                    disabled={checkingIn}
+                    onClick={handleCheckin}
+                  >
+                    {checkingIn ? (
+                      <>
+                        <RefreshCw className="size-4 animate-spin" />
+                        Aguardando GPS...
+                      </>
+                    ) : (
+                      "Iniciar atendimento"
+                    )}
+                  </Button>
+                )}
+              </Card>
+
+              {/* ── Card checklist + execução ─────────────────────────── */}
+              <Card variant="default">
+                {/* Cabeçalho com badge de status geral */}
+                <div className="flex items-center justify-between mb-3">
+                  <strong className="text-[15px] font-semibold" style={{ color: "var(--color-ink)" }}>
+                    Conclusão da OS
+                  </strong>
+                  <Badge tone={canFinish ? "teal" : "amber"} size="md">
                     {canFinish ? "Liberado" : "Pendente"}
-                  </span>
+                  </Badge>
                 </div>
 
-                {/* Checklist items */}
-                <div className="mb-4 grid grid-cols-2 gap-2">
+                {/* Progress bar */}
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                    Progresso: {doneCount} de {requirements.length} etapas
+                  </span>
+                </div>
+                <div
+                  className="h-1.5 w-full rounded-full mb-4"
+                  style={{ background: "var(--color-line)" }}
+                  role="progressbar"
+                  aria-valuenow={progressPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Progresso da OS"
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${progressPct}%`,
+                      background: "var(--color-teal)",
+                    }}
+                  />
+                </div>
+
+                {/* Grid 2×2 checklist */}
+                <div className="grid grid-cols-2 gap-2 mb-4">
                   {requirements.map((r) => (
                     <div
                       key={r.key}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium",
-                        r.done
-                          ? "border-teal-500/30 bg-teal-500/10 text-teal-400"
-                          : "border-white/10 bg-white/5 text-white/40"
+                        "flex items-center gap-1.5 rounded-[var(--radius-sm)] border px-2.5 min-h-[52px]",
+                        "text-[12px] font-medium transition-all duration-200"
                       )}
+                      style={
+                        r.done
+                          ? {
+                              background: "var(--color-teal-soft)",
+                              borderColor: "var(--color-teal-border)",
+                              color: "var(--color-teal)",
+                            }
+                          : {
+                              background: "var(--color-surface-2)",
+                              borderColor: "var(--color-line)",
+                              color: "var(--color-muted)",
+                            }
+                      }
                     >
-                      <CheckCircle2 className="size-3.5 shrink-0" />
+                      {r.done ? (
+                        <CheckCircle2 className="size-4 shrink-0" />
+                      ) : (
+                        <Circle
+                          className="size-4 shrink-0"
+                          style={{ color: "var(--color-disabled)" }}
+                        />
+                      )}
                       {r.label}
                     </div>
                   ))}
                 </div>
 
-                {/* Photos */}
+                {/* ── Seção fotos ───────────────────────────────────────── */}
                 <div className="mb-4">
-                  <p className="mb-2 text-xs text-white/50">Fotos ({photoCount}/3)</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className="text-[13px] font-semibold"
+                      style={{ color: "var(--color-ink)" }}
+                    >
+                      Registro fotográfico
+                    </span>
+                    <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                      {photoCount}/3
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-2">
                     {(["Antes", "Durante", "Depois"] as const).map((label, idx) => {
                       const p = photos[idx];
+                      const uploaded = !!(p.attachmentId && !p.uploading);
+
                       return (
                         <button
                           key={label}
                           onClick={() => handlePhoto(idx)}
                           disabled={p.uploading}
-                          className="relative aspect-square overflow-hidden rounded-xl border border-dashed border-white/20 bg-white/5 active:scale-95 transition-transform disabled:opacity-60"
+                          aria-label={`Foto ${label}${uploaded ? " — enviada" : p.error ? " — erro, toque para tentar novamente" : " — pendente"}`}
+                          className={cn(
+                            "relative aspect-square overflow-hidden rounded-[var(--radius-md)]",
+                            "border-2 border-dashed transition-all duration-200",
+                            "active:scale-[0.97] disabled:opacity-60"
+                          )}
+                          style={
+                            uploaded
+                              ? { borderColor: "var(--color-teal-border)", borderStyle: "solid" }
+                              : p.error
+                              ? { borderColor: "var(--color-red-border)", borderStyle: "dashed" }
+                              : {
+                                  borderColor: "var(--color-line-strong)",
+                                  background: "var(--color-surface-2)",
+                                }
+                          }
                         >
-                          {p.preview ? (
+                          {/* Preview da foto */}
+                          {p.preview && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={p.preview}
                               alt={label}
                               className="absolute inset-0 size-full object-cover"
                             />
-                          ) : (
-                            <Camera className="m-auto size-5 text-white/30" />
                           )}
+
+                          {/* Ícone câmera quando vazio */}
+                          {!p.preview && !p.error && (
+                            <Camera
+                              className="absolute inset-0 m-auto size-6"
+                              style={{ color: "var(--color-disabled)" }}
+                            />
+                          )}
+
+                          {/* Overlay uploading */}
                           {p.uploading && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                              <RefreshCw className="size-4 animate-spin text-white" />
+                            <div
+                              className="absolute inset-0 flex items-center justify-center"
+                              style={{ background: "rgba(13,13,16,0.70)" }}
+                            >
+                              <RefreshCw className="size-5 animate-spin text-white" />
                             </div>
                           )}
-                          {p.error && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-red-900/60">
-                              <span className="text-[9px] text-red-300">Erro</span>
+
+                          {/* Overlay erro */}
+                          {p.error && !p.uploading && (
+                            <div
+                              className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1"
+                              style={{ background: "var(--color-red-soft)" }}
+                            >
+                              <AlertCircle
+                                className="size-4"
+                                style={{ color: "var(--color-red-bright)" }}
+                              />
+                              <span
+                                className="text-center text-[9px] font-medium leading-tight"
+                                style={{ color: "var(--color-red-bright)" }}
+                              >
+                                Toque para tentar novamente
+                              </span>
                             </div>
                           )}
-                          {p.url && !p.uploading && (
+
+                          {/* Badge enviado */}
+                          {uploaded && (
                             <div className="absolute top-1 right-1">
-                              <CheckCircle2 className="size-3.5 text-teal-400 drop-shadow" />
+                              <CheckCircle2
+                                className="size-4 drop-shadow"
+                                style={{ color: "var(--color-teal)" }}
+                              />
                             </div>
                           )}
-                          <span className="absolute bottom-1 left-0 right-0 text-center text-[9px] font-semibold text-white/80 drop-shadow">
+
+                          {/* Label do slot */}
+                          <span className="absolute bottom-1.5 left-0 right-0 text-center text-[10px] font-bold text-white drop-shadow">
                             {label}
                           </span>
                         </button>
@@ -658,12 +1074,21 @@ export default function TecnicoMobilePage() {
                   </div>
                 </div>
 
-                {/* Signature */}
+                {/* ── Seção assinatura ─────────────────────────────────── */}
                 <div className="mb-4">
-                  <p className="mb-2 text-xs text-white/50">Assinatura do cliente</p>
+                  <p
+                    className="mb-2 text-[13px] font-semibold"
+                    style={{ color: "var(--color-ink)" }}
+                  >
+                    Assinatura do cliente
+                  </p>
                   {signature.uploading && (
-                    <div className="mb-2 flex items-center gap-1.5 text-xs text-amber-400">
-                      <RefreshCw className="size-3 animate-spin" /> Salvando assinatura...
+                    <div
+                      className="mb-2 flex items-center gap-1.5 text-[12px]"
+                      style={{ color: "var(--color-amber)" }}
+                    >
+                      <RefreshCw className="size-3 animate-spin" />
+                      Salvando assinatura...
                     </div>
                   )}
                   <SignaturePad
@@ -673,68 +1098,114 @@ export default function TecnicoMobilePage() {
                   />
                 </div>
 
-                {/* Chip ID */}
-                <div className="mb-4 rounded-xl border border-white/10 bg-[#0d0d0d] p-3">
-                  <Label className="text-xs text-white/60">
-                    ID do Chip (ICCID)
+                {/* ── Seção chip ICCID ─────────────────────────────────── */}
+                <div className="mb-4">
+                  <Card variant="subtle">
+                    <Label className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>
+                      ID do Chip (ICCID)
+                    </Label>
                     <Input
                       value={chipDraft}
                       onChange={(e) => setChipDraft(e.target.value)}
-                      placeholder="89550400 1234 5678 9012"
-                      className="mt-1 bg-white/5 border-white/15 text-white min-h-[44px]"
+                      placeholder="89 5504 1234 5678 9012"
+                      className="mt-2"
                       inputMode="numeric"
+                      error={chipDraft.length > 0 && chipDraft.replace(/\D/g, "").length < 18}
+                      aria-label="ID do chip ICCID"
                     />
-                  </Label>
-                  <Button
-                    variant="secondary"
-                    className="mt-2 w-full min-h-[44px]"
-                    onClick={handleChipConfirm}
-                    disabled={!chipDraft.trim() || updateExecution.isPending}
-                  >
-                    <BadgeCheck className="size-4" /> Confirmar chip
-                  </Button>
-                  {chipOk && (
-                    <p className="mt-1.5 text-xs text-teal-400">✓ Chip confirmado: {chipConfirmed}</p>
-                  )}
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="w-full mt-2"
+                      onClick={handleChipConfirm}
+                      disabled={!chipDraft.trim() || updateExecution.isPending}
+                      aria-disabled={!chipDraft.trim() || updateExecution.isPending}
+                    >
+                      <BadgeCheck className="size-4" />
+                      Confirmar chip
+                    </Button>
+                    {chipOk && (
+                      <p
+                        className="mt-2 flex items-center gap-1.5 text-[12px]"
+                        style={{ color: "var(--color-teal)" }}
+                      >
+                        <CheckCircle2 className="size-3.5 shrink-0" />
+                        Chip confirmado: {chipConfirmed}
+                      </p>
+                    )}
+                  </Card>
                 </div>
 
-                {/* Finalize */}
+                {/* ── Botão Finalizar OS ───────────────────────────────── */}
                 <Button
-                  className="w-full min-h-[52px] text-base font-semibold"
+                  variant="primary"
+                  size="xl"
+                  className="w-full"
                   disabled={!canFinish || completeOS.isPending}
+                  aria-disabled={!canFinish || completeOS.isPending}
+                  isLoading={completeOS.isPending}
                   onClick={handleFinalize}
                 >
                   {completeOS.isPending ? (
                     <>
-                      <RefreshCw className="size-4 animate-spin" /> Finalizando...
+                      <RefreshCw className="size-4 animate-spin" />
+                      Finalizando...
                     </>
                   ) : (
                     "Finalizar OS"
                   )}
                 </Button>
-              </div>
+
+                {/* Hint quando desabilitado */}
+                {!canFinish && (
+                  <p
+                    className="mt-2 text-center text-[11px]"
+                    style={{ color: "var(--color-muted)" }}
+                    aria-live="polite"
+                  >
+                    Complete todas as etapas para finalizar
+                  </p>
+                )}
+              </Card>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* OS Concluída */}
+        {/* ── Estado OS Concluída ─────────────────────────────────────────── */}
         <AnimatePresence>
           {activeOrder?.status === "COMPLETED" && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              key="completed"
+              initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="rounded-xl border border-teal-500/30 bg-teal-500/10 p-6 text-center"
+              transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
             >
-              <CheckCircle2 className="mx-auto mb-2 size-10 text-teal-400" />
-              <strong className="block text-base text-white">OS Concluída!</strong>
-              <p className="mt-1 text-sm text-white/60">OS #{activeOrder.number} foi finalizada.</p>
-              <Button
-                variant="secondary"
-                className="mt-4 min-h-[44px]"
-                onClick={() => setActiveOrderId(null)}
-              >
-                Ver outras OS
-              </Button>
+              <Card tone="teal" variant="elevated" className="text-center p-8">
+                <CheckCircle2
+                  className="mx-auto mb-3 size-14"
+                  style={{ color: "var(--color-teal)" }}
+                />
+                <strong
+                  className="block text-[17px] font-bold"
+                  style={{ color: "var(--color-ink)" }}
+                >
+                  OS #{activeOrder.number} Concluída!
+                </strong>
+                <p
+                  className="mt-1 text-[13px]"
+                  style={{ color: "var(--color-muted)" }}
+                >
+                  {activeOrder.client.name} — atendimento encerrado
+                </p>
+                <Button
+                  variant="secondary"
+                  size="default"
+                  className="mt-5"
+                  onClick={() => setActiveOrderId(null)}
+                >
+                  Ver outras OS
+                </Button>
+              </Card>
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../lib/prisma';
+import { prisma, TxClient } from '../../lib/prisma';
 import { AppError, NotFoundError, InsufficientStockError, ConcurrencyError } from '../../shared/errors';
 import { audit } from '../audit/audit.service';
 import { parsePagination, buildPaginatedResult } from '../../shared/pagination';
@@ -26,10 +26,10 @@ export interface AdjustStockParams {
 
 export class StockService {
   // Calcula saldo a partir dos movimentos. Usa o último balanceAfter para eficiência.
-  async getBalance(productId: string, tx?: Prisma.TransactionClient): Promise<StockBalance> {
+  async getBalance(productId: string, tx?: TxClient): Promise<StockBalance> {
     const db = tx ?? prisma;
 
-    const lastMovement = await (db as typeof prisma).stockMovement.findFirst({
+    const lastMovement = await db.stockMovement.findFirst({
       where: { productId },
       orderBy: { createdAt: 'desc' },
       select: { balanceAfter: true },
@@ -37,7 +37,7 @@ export class StockService {
 
     const physical = lastMovement?.balanceAfter ?? 0;
 
-    const reservedAgg = await (db as typeof prisma).stockReservation.aggregate({
+    const reservedAgg = await db.stockReservation.aggregate({
       where: { productId, status: 'ACTIVE' },
       _sum: { quantity: true },
     });

@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import { orderTone, sortOrders, toneBorder } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 import { useVisibleOrders } from "@/hooks/use-visible-orders";
+import { useUIStore } from "@/store/use-ui-store";
 
 export function OrderQueue() {
   const orders = sortOrders(useVisibleOrders().filter((o) => o.team !== "Sem equipe" && o.team !== ""));
+  const setSection = useUIStore((s) => s.setSection);
 
   return (
     <Card>
       <SectionHeading eyebrow="Hoje" title="Fila de OS">
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" onClick={() => setSection("ordens")}>
           Ver todas
         </Button>
       </SectionHeading>

@@ -19,6 +19,10 @@ if (
 
 const DEFAULT_PASS = process.env.SEED_DEFAULT_PASS ?? KNOWN_DEFAULT;
 
+// companyId da empresa de seed. Deve existir no banco antes de rodar este script.
+// Configure SEED_COMPANY_ID no ambiente ou use o valor de dev hardcoded.
+const SEED_COMPANY_ID = process.env.SEED_COMPANY_ID ?? 'seed-company-id';
+
 const users = [
   { email: 'admin@controle.com',       password: process.env.SEED_ADMIN_PASS     ?? DEFAULT_PASS, role: 'ADMIN'      },
   { email: 'estoque@controle.com',     password: process.env.SEED_STOCK_PASS     ?? DEFAULT_PASS, role: 'STOCK'      },
@@ -29,10 +33,20 @@ const users = [
 
 async function main() {
   for (const u of users) {
-    const exists = await prisma.user.findUnique({ where: { email: u.email } });
+    // Schema multi-tenant: unicidade é [email, companyId]
+    const exists = await prisma.user.findFirst({
+      where: { email: u.email, companyId: SEED_COMPANY_ID },
+    });
     if (exists) { console.log(`Já existe: ${u.email}`); continue; }
     const hashed = await bcrypt.hash(u.password, 12);
-    await prisma.user.create({ data: { email: u.email, password: hashed, role: u.role } });
+    await prisma.user.create({
+      data: {
+        email: u.email,
+        password: hashed,
+        role: u.role,
+        company: { connect: { id: SEED_COMPANY_ID } },
+      },
+    });
     console.log(`Criado: ${u.email} (${u.role})`);
   }
   await prisma.$disconnect();

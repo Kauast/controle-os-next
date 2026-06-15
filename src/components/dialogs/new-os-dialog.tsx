@@ -17,9 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TEAMS } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, tomorrowDate } from "@/lib/utils";
 import { useUIStore } from "@/store/use-ui-store";
 import { useClients } from "@/hooks/useClients";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useTechnicians } from "@/hooks/useTechnicians";
 import { useCreateServiceOrder } from "@/hooks/useServiceOrders";
 
@@ -41,12 +42,6 @@ const stepFields: Record<number, (keyof Form)[]> = {
   3: ["scheduledTime", "team", "dueDate"],
 };
 
-function tomorrowDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 2);
-  return d.toISOString().split("T")[0];
-}
-
 export function NewOsDialog() {
   const open = useUIStore((s) => s.newOsOpen);
   const setOpen = useUIStore((s) => s.setNewOsOpen);
@@ -54,7 +49,8 @@ export function NewOsDialog() {
   const [error, setError] = useState("");
   const [clientSearch, setClientSearch] = useState("");
 
-  const { data: clientsData } = useClients(clientSearch);
+  const debouncedClientSearch = useDebounce(clientSearch, 400);
+  const { data: clientsData } = useClients(debouncedClientSearch);
   const clients = clientsData?.clients ?? [];
   const { data: technicians = [] } = useTechnicians();
   const createOS = useCreateServiceOrder();
@@ -110,7 +106,11 @@ export function NewOsDialog() {
       });
       setOpen(false);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erro ao criar OS.");
+      const axiosMsg =
+        (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data
+          ?.error ??
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(axiosMsg ?? (e instanceof Error ? e.message : "Erro ao criar OS."));
     }
   }
 
@@ -273,7 +273,7 @@ export function NewOsDialog() {
                 </p>
                 <p className="text-xs text-muted">
                   <strong>Prazo:</strong> {watch("dueDate")} · <strong>Prioridade:</strong>{" "}
-                  {watch("priority")}
+                  {{ NORMAL: "Normal", WARNING: "Média", HIGH: "Alta" }[watch("priority")] ?? watch("priority")}
                 </p>
               </div>
             )}

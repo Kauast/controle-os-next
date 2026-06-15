@@ -16,9 +16,21 @@ function AuthInitializer() {
   const setRole = useAppStore((s) => s.setRole);
 
   useEffect(() => {
-    fetch("/api/auth/me")
+    // Garante que o cookie csrf_token existe antes da primeira mutação.
+    // Não bloqueia: se falhar, o cookie simplesmente não estará presente
+    // e o servidor retornará 403 na próxima mutação (usuário verá erro).
+    const hasCsrf = document.cookie.includes("csrf_token=");
+    if (!hasCsrf) {
+      fetch("/api/auth/csrf").catch(() => undefined);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    fetch("/api/auth/me", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { user: AuthUser } | null) => {
+        clearTimeout(timeout);
         if (data?.user) {
           setUser(data.user);
           setRole(backendRoleToFrontend(data.user.role));
@@ -26,7 +38,10 @@ function AuthInitializer() {
           setUser(null);
         }
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        clearTimeout(timeout);
+        setUser(null);
+      });
   }, [setUser, setLoading, setRole]);
 
   return null;
