@@ -171,9 +171,7 @@ export default function TecnicoMobilePage() {
 
   // OS activa: a primeira não finalizada/cancelada
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
-  const activeOrder =
-    orders.find((o) => o.id === activeOrderId) ??
-    orders.find((o) => o.status === "IN_PROGRESS" || o.status === "OPEN");
+  const activeOrder = orders.find((o) => o.id === activeOrderId) ?? null;
 
   // ─── Execution state ────────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<[PhotoSlotState, PhotoSlotState, PhotoSlotState]>([
@@ -298,7 +296,7 @@ export default function TecnicoMobilePage() {
 
   // ─── Checklist ──────────────────────────────────────────────────────────────
   const photoCount = photos.filter((p) => p.attachmentId ?? p.preview).length;
-  const chipOk = !!chipConfirmed && chipConfirmed.replace(/\D/g, "").length >= 5;
+  const chipOk = !!chipConfirmed && chipConfirmed.replace(/\D/g, "").length >= 18;
   const hasSignature = !!(signature.attachmentId ?? signature.preview);
   const isCompleted = activeOrder?.status === "COMPLETED";
 
@@ -1112,7 +1110,7 @@ export default function TecnicoMobilePage() {
                       placeholder="89 5504 1234 5678 9012"
                       className="mt-2"
                       inputMode="numeric"
-                      error={chipDraft.length > 0 && chipDraft.replace(/\D/g, "").length < 5}
+                      error={chipDraft.length > 0 && chipDraft.replace(/\D/g, "").length < 18}
                       aria-label="ID do chip ICCID"
                     />
                     <Button

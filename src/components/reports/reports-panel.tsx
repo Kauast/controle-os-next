@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { BarChart3, Download, FileText, Sheet } from "lucide-react";
 import { Card, SectionHeading } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ const PERIOD_OPTIONS = [
 function ExportButton({ label, icon: Icon }: { label: string; icon: typeof Download }) {
   return (
     <button
-      onClick={() => alert(`Exportar ${label} — em breve`)}
+      onClick={() => toast.info(`Exportação de ${label} disponível em breve.`)}
       className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-2 text-xs font-medium text-muted transition-colors hover:bg-white/8 hover:text-ink"
       aria-label={`Exportar como ${label}`}
     >

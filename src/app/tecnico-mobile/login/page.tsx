@@ -9,8 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { storeMobileToken } from "@/lib/api/mobile-client";
 
-const FASTIFY_URL = process.env.NEXT_PUBLIC_FASTIFY_URL ?? "http://localhost:3333";
-
 export default function TecnicoMobileLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -25,7 +23,7 @@ export default function TecnicoMobileLoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${FASTIFY_URL}/api/auth/login`, {
+      const res = await fetch("/api/auth/mobile-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -223,18 +221,8 @@ export default function TecnicoMobileLoginPage() {
         </div>
       </motion.div>
 
-      {/* Rodapé servidor */}
-      <p
-        className="mt-8 text-[11px] text-center"
-        style={{ color: "var(--color-disabled)" }}
-      >
-        Servidor:{" "}
-        <span
-          className="font-mono select-all"
-          style={{ color: "var(--color-muted)" }}
-        >
-          {FASTIFY_URL}
-        </span>
+      <p className="mt-8 text-[11px] text-center" style={{ color: "var(--color-disabled)" }}>
+        Problemas de acesso? Contate o administrador do sistema.
       </p>
     </div>
   );

@@ -62,7 +62,17 @@ export function TeamsPanel() {
   if (isLoading) {
     return (
       <Card>
-        <div className="py-16 text-center text-sm text-muted">Carregando técnicos...</div>
+        <SectionHeading eyebrow="Campo" title="Status das equipes e técnicos" />
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-[72px] animate-pulse rounded-[12px] bg-panel-soft/60" />
+          ))}
+        </div>
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-[52px] animate-pulse rounded-[12px] bg-panel-soft/60" />
+          ))}
+        </div>
       </Card>
     );
   }

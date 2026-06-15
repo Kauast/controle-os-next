@@ -20,6 +20,7 @@ import { TEAMS } from "@/lib/types";
 import { cn, tomorrowDate } from "@/lib/utils";
 import { useUIStore } from "@/store/use-ui-store";
 import { useClients } from "@/hooks/useClients";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useTechnicians } from "@/hooks/useTechnicians";
 import { useCreateServiceOrder } from "@/hooks/useServiceOrders";
 
@@ -48,7 +49,8 @@ export function NewOsDialog() {
   const [error, setError] = useState("");
   const [clientSearch, setClientSearch] = useState("");
 
-  const { data: clientsData } = useClients(clientSearch);
+  const debouncedClientSearch = useDebounce(clientSearch, 400);
+  const { data: clientsData } = useClients(debouncedClientSearch);
   const clients = clientsData?.clients ?? [];
   const { data: technicians = [] } = useTechnicians();
   const createOS = useCreateServiceOrder();
@@ -271,7 +273,7 @@ export function NewOsDialog() {
                 </p>
                 <p className="text-xs text-muted">
                   <strong>Prazo:</strong> {watch("dueDate")} · <strong>Prioridade:</strong>{" "}
-                  {watch("priority")}
+                  {{ NORMAL: "Normal", WARNING: "Média", HIGH: "Alta" }[watch("priority")] ?? watch("priority")}
                 </p>
               </div>
             )}
