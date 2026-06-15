@@ -20,6 +20,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import userRoutes from './routes/userRoutes';
 import auditRoutes from './routes/auditRoutes';
 import aiRoutes from './routes/aiRoutes';
+import teamRoutes from './routes/teamRoutes';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
 import { config } from './lib/config';
@@ -187,6 +188,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(userRoutes, { prefix: '/api/users' });
   await app.register(auditRoutes, { prefix: '/api/audit' });
   await app.register(aiRoutes, { prefix: '/api/ai' });
+  await app.register(teamRoutes, { prefix: '/api/teams' });
 
   return app;
 }
