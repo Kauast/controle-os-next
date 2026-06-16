@@ -1,13 +1,10 @@
 import Fastify, { FastifyInstance, FastifyBaseLogger, FastifyRequest } from 'fastify';
 import { randomUUID } from 'crypto';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
 import { ZodError } from 'zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
-import staticPlugin from '@fastify/static';
 import serviceOrderRoutes from './routes/serviceOrderRoutes';
 import clientRoutes from './routes/clientRoutes';
 import technicianRoutes from './routes/technicianRoutes';
@@ -20,6 +17,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import userRoutes from './routes/userRoutes';
 import auditRoutes from './routes/auditRoutes';
 import aiRoutes from './routes/aiRoutes';
+import teamRoutes from './routes/teamRoutes';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
 import { config } from './lib/config';
@@ -166,15 +164,6 @@ export async function buildApp(): Promise<FastifyInstance> {
     return reply.send(await metricsText());
   });
 
-  // Serve pasta de uploads (fotos, assinaturas)
-  const uploadDir = process.env.UPLOAD_DIR ? join(process.cwd(), process.env.UPLOAD_DIR) : join(process.cwd(), 'uploads');
-  if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
-  await app.register(staticPlugin, {
-    root: uploadDir,
-    prefix: '/uploads/',
-    decorateReply: false,
-  });
-
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(serviceOrderRoutes, { prefix: '/api/service-orders' });
   await app.register(clientRoutes, { prefix: '/api/clients' });
@@ -187,6 +176,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(userRoutes, { prefix: '/api/users' });
   await app.register(auditRoutes, { prefix: '/api/audit' });
   await app.register(aiRoutes, { prefix: '/api/ai' });
+  await app.register(teamRoutes, { prefix: '/api/teams' });
 
   return app;
 }

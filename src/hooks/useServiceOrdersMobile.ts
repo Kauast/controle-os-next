@@ -23,8 +23,14 @@ export interface MobileExecution {
   checkinLng?: number | null;
   checkoutLat?: number | null;
   checkoutLng?: number | null;
+  /** @deprecated Use photoAttachmentIds. Mantido enquanto o backend migra. */
   photoUrls?: string[];
+  /** IDs dos anexos de foto (novo contrato). Download via /api/attachments/:id/download. */
+  photoAttachmentIds?: string[];
+  /** @deprecated Use signatureAttachmentId. Mantido enquanto o backend migra. */
   clientSignature?: string | null;
+  /** ID do anexo de assinatura (novo contrato). */
+  signatureAttachmentId?: string | null;
   workDoneNotes?: string | null;
 }
 
@@ -123,8 +129,12 @@ export function useCheckin(serviceOrderId: string) {
 }
 
 interface UpdateExecutionPayload {
+  /** @deprecated Use photoAttachmentIds. Mantido enquanto o backend migra. */
   photoUrls?: string[];
+  photoAttachmentIds?: string[];
+  /** @deprecated Use signatureAttachmentId. Mantido enquanto o backend migra. */
   clientSignature?: string;
+  signatureAttachmentId?: string;
   chipIccid?: string;
   checkoutAt?: string;
   checkoutLat?: number;
@@ -190,25 +200,44 @@ export function useCompleteOS(serviceOrderId: string) {
 
 // ─── Upload helpers ──────────────────────────────────────────────────────────
 
-export async function uploadPhotoBlob(blob: Blob, filename = "photo.jpg"): Promise<string> {
-  const form = new FormData();
-  form.append("file", blob, filename);
-  const { data } = await mobileApiClient.post<{ url: string }>("/uploads", form, {
-    headers: { "Content-Type": undefined as unknown as string }, // deixa axios definir o boundary
-  });
-  return data.url;
+interface UploadResponse {
+  attachmentId: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  entityType?: string;
+  entityId?: string;
 }
 
+/**
+ * Envia um Blob para /uploads e retorna o attachmentId gerado pelo backend.
+ * O download posterior e feito via /api/attachments/:id/download (autenticado).
+ */
+export async function uploadPhotoBlob(blob: Blob, orderId: string, filename = "photo.jpg"): Promise<string> {
+  const form = new FormData();
+  form.append("file", blob, filename);
+  form.append("serviceOrderId", orderId);
+  const { data } = await mobileApiClient.post<UploadResponse>("/uploads", form, {
+    headers: { "Content-Type": undefined as unknown as string }, // deixa axios definir o boundary
+  });
+  return data.attachmentId;
+}
+
+/**
+ * Converte um dataUrl base64 em Blob, envia para /uploads e retorna o attachmentId.
+ */
 export async function uploadSignatureDataUrl(dataUrl: string, orderId: string): Promise<string> {
   const [, base64] = dataUrl.split(",");
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
   const blob = new Blob([bytes], { type: "image/png" });
   const form = new FormData();
   form.append("file", blob, `signature-${orderId}.png`);
-  const { data } = await mobileApiClient.post<{ url: string }>("/uploads", form, {
+  form.append("serviceOrderId", orderId);
+  const { data } = await mobileApiClient.post<UploadResponse>("/uploads", form, {
     headers: { "Content-Type": undefined as unknown as string },
   });
-  return data.url;
+  return data.attachmentId;
 }
 
 // ─── Material Requests ───────────────────────────────────────────────────────

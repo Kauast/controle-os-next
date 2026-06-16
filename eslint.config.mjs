@@ -12,7 +12,21 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "backend-senior/**", "scripts/**"],
+    ignores: [
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts",
+      "backend-senior/**",
+      "services/**",
+      ".claude/**",
+      ".superpowers/**",
+      "scripts/**",
+      // Assets minificados do build Capacitor Android — não fazer lint
+      "android/**",
+      // Build estático para o app mobile (Capacitor)
+      "out-mobile/**",
+    ],
   },
 ];
 

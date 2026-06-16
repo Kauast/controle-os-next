@@ -428,7 +428,7 @@ export class ServiceOrderService {
           client: { select: { id: true, name: true, document: true, phone: true, address: true, city: true, state: true } },
           technician: { select: { id: true, name: true } },
           team: { select: { id: true, name: true } },
-          execution: { select: { checkinAt: true, checkoutAt: true, checkinLat: true, checkinLng: true, photoUrls: true, clientSignature: true } },
+          execution: { select: { checkinAt: true, checkoutAt: true, checkinLat: true, checkinLng: true, photoUrls: true, clientSignature: true, photoAttachmentIds: true, signatureAttachmentId: true } },
           _count: { select: { items: true, attachments: true } },
         },
         orderBy: [{ priority: 'desc' }, { openingDate: 'desc' }],

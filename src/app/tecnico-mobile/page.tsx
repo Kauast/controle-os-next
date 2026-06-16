@@ -356,7 +356,8 @@ export default function TecnicoMobilePage() {
         return next;
       });
       // Upload — retorna attachmentId (sem URL publica)
-      const attachmentId = await uploadPhotoBlob(result.blob, result.filename);
+      const attachmentId = await uploadPhotoBlob(result.blob, activeOrder?.id ?? "", result.filename);
+      let freshIds: string[] = [];
       setPhotos((prev) => {
         const next = [...prev] as typeof prev;
         // Mantem o dataUrl local como preview; registra o attachmentId
@@ -366,13 +367,11 @@ export default function TecnicoMobilePage() {
           uploading: false,
           error: false,
         };
+        freshIds = next.map((p) => p.attachmentId ?? "").filter(Boolean);
         return next;
       });
-      // Persiste os IDs dos anexos no backend
-      const ids = [...photos].map((p, i) =>
-        i === slotIndex ? attachmentId : (p.attachmentId ?? "")
-      );
-      await updateExecution.mutateAsync({ photoAttachmentIds: ids.filter(Boolean) });
+      // Persiste os IDs dos anexos no backend usando o estado mais recente
+      await updateExecution.mutateAsync({ photoAttachmentIds: freshIds });
     } catch (err) {
       if (err instanceof Error && err.message === "Foto cancelada") return;
       setPhotos((prev) => {

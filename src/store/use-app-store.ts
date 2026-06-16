@@ -2,15 +2,6 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  seedLocations,
-  seedMovements,
-  seedOrders,
-  seedProducts,
-  seedRequests,
-  seedTeamAccounts,
-  seedTechnicians,
-} from "@/lib/seed";
 import type {
   AuditEntry,
   MaterialRequest,
@@ -77,7 +68,14 @@ interface AppState {
   verifyChip: (id: string) => void;
 }
 
-export const teamAccounts = seedTeamAccounts;
+/** Contas de equipe padrão — temporárias até migração para autenticação via API. */
+export const teamAccounts: import("@/lib/types").TeamAccount[] = [
+  { team: "Equipe 1", user: "equipe1", password: "1234", members: "Tecnico A, Tecnico B" },
+  { team: "Equipe 2", user: "equipe2", password: "1234", members: "Tecnico C, Tecnico D" },
+  { team: "Equipe 3", user: "equipe3", password: "1234", members: "Tecnico E, Tecnico F" },
+  { team: "Equipe 4", user: "equipe4", password: "1234", members: "Tecnico G, Tecnico H" },
+  { team: "Equipe 5", user: "equipe5", password: "1234", members: "Tecnico I, Tecnico J" },
+];
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -86,12 +84,12 @@ export const useAppStore = create<AppState>()(
       activeTeam: "Equipe 1",
       activeTeamAccount: null,
 
-      orders: seedOrders,
-      products: seedProducts,
-      movements: seedMovements,
-      requests: seedRequests,
-      technicians: seedTechnicians,
-      locations: seedLocations,
+      orders: [],
+      products: [],
+      movements: [],
+      requests: [],
+      technicians: [],
+      locations: [],
       audit: [],
 
       checkinDone: false,
@@ -109,6 +107,7 @@ export const useAppStore = create<AppState>()(
 
       loginTeam: (team) => {
         const account = teamAccounts.find((a) => a.team === team) ?? teamAccounts[0];
+        if (!account) return;
         set({
           role: "tecnico",
           activeTeam: account.team,

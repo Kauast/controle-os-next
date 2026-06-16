@@ -10,6 +10,7 @@ export interface ServiceOrder {
   description: string;
   tech: string;
   time: string;
+  scheduledStart?: string | null;
   team: string;
   priority: Priority;
   status: OrderStatus;

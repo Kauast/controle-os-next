@@ -9,6 +9,7 @@ export interface ServiceOrder {
   team: string;
   priority: "NORMAL" | "WARNING" | "HIGH";
   scheduledTime?: string;
+  scheduledStart?: string | null;
   description?: string;
   technicianId?: string;
   checkinAt?: string;
@@ -22,7 +23,6 @@ export interface ServiceOrder {
   createdAt: string;
   client: { id: string; name: string; phone?: string; email?: string };
   technician?: { id: string; name: string; team: string } | null;
-  [key: string]: unknown;
 }
 
 export interface ServiceOrdersResponse {
@@ -71,8 +71,17 @@ async function updateServiceOrderStatus(id: string, status: string, cancellation
   return data;
 }
 
-async function assignServiceOrder(id: string, team: string, technicianId?: string | null): Promise<ServiceOrder> {
-  const { data } = await apiClient.patch(`/service-orders/${id}/assign`, { team, technicianId });
+async function assignServiceOrder(
+  id: string,
+  team: string,
+  technicianId?: string | null,
+  scheduledStart?: string | null,
+): Promise<ServiceOrder> {
+  const { data } = await apiClient.patch(`/service-orders/${id}/assign`, {
+    team,
+    technicianId,
+    ...(scheduledStart ? { scheduledStart } : {}),
+  });
   return data;
 }
 
@@ -168,8 +177,12 @@ export function useUpdateServiceOrderStatus() {
 export function useAssignServiceOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, team, technicianId }: { id: string; team: string; technicianId?: string | null }) =>
-      assignServiceOrder(id, team, technicianId),
+    mutationFn: ({ id, team, technicianId, scheduledStart }: {
+      id: string;
+      team: string;
+      technicianId?: string | null;
+      scheduledStart?: string | null;
+    }) => assignServiceOrder(id, team, technicianId, scheduledStart),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["service-orders"] });
     },
