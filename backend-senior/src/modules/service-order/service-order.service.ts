@@ -143,6 +143,11 @@ export class ServiceOrderService {
       });
       if (!os) throw new NotFoundError('OS');
 
+      // Concorrência otimista cliente↔servidor: rejeita edição baseada em estado obsoleto.
+      if (input.expectedVersion !== undefined && input.expectedVersion !== os.version) {
+        throw new ConcurrencyError();
+      }
+
       if (user.role === 'TECHNICIAN') {
         const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
@@ -257,6 +262,9 @@ export class ServiceOrderService {
     return prisma.$transaction(async (tx) => {
       const os = await tx.serviceOrder.findFirst({ where: { id, companyId: user.companyId } });
       if (!os) throw new NotFoundError('OS');
+      if (input.expectedVersion !== undefined && input.expectedVersion !== os.version) {
+        throw new ConcurrencyError();
+      }
       if (['COMPLETED', 'CANCELLED'].includes(os.status)) {
         throw new AppError('Não é possível reatribuir uma OS finalizada ou cancelada', 422);
       }
@@ -310,6 +318,9 @@ export class ServiceOrderService {
     return prisma.$transaction(async (tx) => {
       const os = await tx.serviceOrder.findFirst({ where: { id, companyId: user.companyId } });
       if (!os) throw new NotFoundError('OS');
+      if (data.expectedVersion !== undefined && data.expectedVersion !== os.version) {
+        throw new ConcurrencyError();
+      }
       if (['COMPLETED', 'CANCELLED'].includes(os.status)) {
         throw new AppError('OS finalizada ou cancelada', 422);
       }
@@ -340,9 +351,15 @@ export class ServiceOrderService {
         update: execData,
       });
 
-      if (data.chipIccid !== undefined) {
-        await tx.serviceOrder.update({ where: { id }, data: { chipIccid: data.chipIccid } });
-      }
+      // Optimistic lock: incrementa a versão da OS (e grava chipIccid junto) com guard.
+      const bumped = await tx.serviceOrder.updateMany({
+        where: { id, companyId: user.companyId, version: os.version },
+        data: {
+          ...(data.chipIccid !== undefined ? { chipIccid: data.chipIccid } : {}),
+          version: { increment: 1 },
+        },
+      });
+      if (bumped.count === 0) throw new ConcurrencyError();
 
       await tx.serviceOrderEvent.create({
         data: {
