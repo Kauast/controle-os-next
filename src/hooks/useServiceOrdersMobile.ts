@@ -111,8 +111,8 @@ export function useCheckin(serviceOrderId: string) {
     mutationFn: async (payload: CheckinPayload) => {
       const online = await getNetworkStatus();
       if (online === "offline") {
-        enqueue({ serviceOrderId, type: "UPDATE_STATUS", payload: { status: "IN_PROGRESS" } });
-        enqueue({ serviceOrderId, type: "CHECKIN", payload: payload as unknown as Record<string, unknown> });
+        await enqueue({ serviceOrderId, type: "UPDATE_STATUS", payload: { status: "IN_PROGRESS" } });
+        await enqueue({ serviceOrderId, type: "CHECKIN", payload: payload as unknown as Record<string, unknown> });
         return null;
       }
       await mobileApiClient.patch(`/service-orders/${serviceOrderId}/status`, {
@@ -148,7 +148,7 @@ export function useUpdateExecution(serviceOrderId: string) {
     mutationFn: async (payload: UpdateExecutionPayload) => {
       const online = await getNetworkStatus();
       if (online === "offline") {
-        enqueue({
+        await enqueue({
           serviceOrderId,
           type: "UPDATE_EXECUTION",
           payload: payload as Record<string, unknown>,
@@ -175,12 +175,12 @@ export function useCompleteOS(serviceOrderId: string) {
     }) => {
       const online = await getNetworkStatus();
       if (online === "offline") {
-        enqueue({
+        await enqueue({
           serviceOrderId,
           type: "UPDATE_EXECUTION",
           payload: payload as Record<string, unknown>,
         });
-        enqueue({
+        await enqueue({
           serviceOrderId,
           type: "COMPLETE_OS",
           payload: { status: "COMPLETED" },

@@ -139,7 +139,7 @@ export default function TecnicoMobilePage() {
 
   // Atualiza contador de pendentes
   useEffect(() => {
-    const update = () => setPendingSync(getPendingCount());
+    const update = () => { getPendingCount().then(setPendingSync); };
     update();
     const id = setInterval(update, 5000);
     return () => clearInterval(id);
@@ -148,16 +148,18 @@ export default function TecnicoMobilePage() {
   // Sincroniza fila quando voltar online
   useEffect(() => {
     if (!isOnline) return;
-    if (getPendingCount() === 0) return;
-    setIsSyncing(true);
-    syncQueue(mobileApiClient)
-      .then(({ synced, failed }) => {
-        clearDoneItems();
-        setPendingSync(getPendingCount());
-        if (synced > 0) toast.success(`${synced} ação(ões) sincronizadas.`);
-        if (failed > 0) toast.error(`${failed} ação(ões) falharam ao sincronizar.`);
-      })
-      .finally(() => setIsSyncing(false));
+    getPendingCount().then((count) => {
+      if (count === 0) return;
+      setIsSyncing(true);
+      syncQueue(mobileApiClient)
+        .then(async ({ synced, failed }) => {
+          await clearDoneItems();
+          getPendingCount().then(setPendingSync);
+          if (synced > 0) toast.success(`${synced} ação(ões) sincronizadas.`);
+          if (failed > 0) toast.error(`${failed} ação(ões) falharam ao sincronizar.`);
+        })
+        .finally(() => setIsSyncing(false));
+    });
   }, [isOnline]);
 
   const { data: me, isLoading: meLoading } = useCurrentUserMobile();
@@ -453,9 +455,9 @@ export default function TecnicoMobilePage() {
     }
     setIsSyncing(true);
     syncQueue(mobileApiClient)
-      .then(({ synced, failed }) => {
-        clearDoneItems();
-        setPendingSync(getPendingCount());
+      .then(async ({ synced, failed }) => {
+        await clearDoneItems();
+        getPendingCount().then(setPendingSync);
         if (synced > 0) toast.success(`${synced} sincronizadas.`);
         if (failed > 0) toast.error(`${failed} falharam.`);
       })
