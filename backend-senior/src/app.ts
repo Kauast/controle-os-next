@@ -24,6 +24,7 @@ import { config } from './lib/config';
 import { metricsText, metricsContentType } from './lib/metrics';
 import { healthReport, livenessReport } from './lib/health';
 import { registerObservability, logRequestError } from './plugins/observability';
+import { registerIdempotency } from './plugins/idempotency';
 import { redis } from './lib/cache';
 
 // Decodifica payload JWT sem verificar assinatura — apenas para identificar o tenant no rate limit.
@@ -164,6 +165,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     reply.header('Content-Type', metricsContentType);
     return reply.send(await metricsText());
   });
+
+  // Idempotência de mutações via header Idempotency-Key (após jwt, antes das rotas).
+  registerIdempotency(app);
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(serviceOrderRoutes, { prefix: '/api/service-orders' });
