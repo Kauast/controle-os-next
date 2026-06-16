@@ -717,3 +717,19 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
 }
+
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  companyId    String
+  key          String
+  method       String
+  path         String
+  requestHash  String
+  statusCode   Int
+  responseBody Json
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@unique([companyId, key])
+  @@index([expiresAt])
+}
