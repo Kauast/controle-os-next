@@ -38,7 +38,7 @@ import { getNetworkStatus, listenNetworkChanges } from "@/lib/mobile/network";
 import { getPendingCount, syncQueue, clearDoneItems } from "@/lib/mobile/offline-queue";
 import {
   initMobileAuth,
-  removeMobileToken,
+  removeMobileTokens,
   mobileApiClient,
 } from "@/lib/api/mobile-client";
 import {
@@ -150,7 +150,7 @@ export default function TecnicoMobilePage() {
     if (!isOnline) return;
     if (getPendingCount() === 0) return;
     setIsSyncing(true);
-    syncQueue(mobileApiClient)
+    syncQueue(mobileApiClient, me?.id ?? "unknown")
       .then(({ synced, failed }) => {
         clearDoneItems();
         setPendingSync(getPendingCount());
@@ -317,7 +317,7 @@ export default function TecnicoMobilePage() {
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
   async function handleLogout() {
-    await removeMobileToken();
+    await removeMobileTokens();
     router.replace("/tecnico-mobile/login/");
   }
 
@@ -452,7 +452,7 @@ export default function TecnicoMobilePage() {
       return;
     }
     setIsSyncing(true);
-    syncQueue(mobileApiClient)
+    syncQueue(mobileApiClient, me?.id ?? "unknown")
       .then(({ synced, failed }) => {
         clearDoneItems();
         setPendingSync(getPendingCount());

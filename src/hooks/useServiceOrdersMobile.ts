@@ -107,12 +107,14 @@ interface CheckinPayload {
 
 export function useCheckin(serviceOrderId: string) {
   const qc = useQueryClient();
+  const { data: me } = useCurrentUserMobile();
   return useMutation({
     mutationFn: async (payload: CheckinPayload) => {
       const online = await getNetworkStatus();
       if (online === "offline") {
-        enqueue({ serviceOrderId, type: "UPDATE_STATUS", payload: { status: "IN_PROGRESS" } });
-        enqueue({ serviceOrderId, type: "CHECKIN", payload: payload as unknown as Record<string, unknown> });
+        const userId = me?.id ?? "unknown";
+        enqueue({ userId, serviceOrderId, type: "UPDATE_STATUS", payload: { status: "IN_PROGRESS" } });
+        enqueue({ userId, serviceOrderId, type: "CHECKIN", payload: payload as unknown as Record<string, unknown> });
         return null;
       }
       await mobileApiClient.patch(`/service-orders/${serviceOrderId}/status`, {
@@ -144,11 +146,13 @@ interface UpdateExecutionPayload {
 
 export function useUpdateExecution(serviceOrderId: string) {
   const qc = useQueryClient();
+  const { data: me } = useCurrentUserMobile();
   return useMutation({
     mutationFn: async (payload: UpdateExecutionPayload) => {
       const online = await getNetworkStatus();
       if (online === "offline") {
         enqueue({
+          userId: me?.id ?? "unknown",
           serviceOrderId,
           type: "UPDATE_EXECUTION",
           payload: payload as Record<string, unknown>,
@@ -167,6 +171,7 @@ export function useUpdateExecution(serviceOrderId: string) {
 
 export function useCompleteOS(serviceOrderId: string) {
   const qc = useQueryClient();
+  const { data: me } = useCurrentUserMobile();
   return useMutation({
     mutationFn: async (payload: {
       checkoutAt: string;
@@ -175,12 +180,15 @@ export function useCompleteOS(serviceOrderId: string) {
     }) => {
       const online = await getNetworkStatus();
       if (online === "offline") {
+        const userId = me?.id ?? "unknown";
         enqueue({
+          userId,
           serviceOrderId,
           type: "UPDATE_EXECUTION",
           payload: payload as Record<string, unknown>,
         });
         enqueue({
+          userId,
           serviceOrderId,
           type: "COMPLETE_OS",
           payload: { status: "COMPLETED" },

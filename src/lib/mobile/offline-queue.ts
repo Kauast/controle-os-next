@@ -6,6 +6,7 @@ export type QueueActionType =
 
 export interface QueueAction {
   id: string;
+  userId: string;
   serviceOrderId: string;
   type: QueueActionType;
   payload: Record<string, unknown>;
@@ -15,7 +16,7 @@ export interface QueueAction {
   error?: string;
 }
 
-const QUEUE_KEY = "offline_queue_v1";
+const QUEUE_KEY = "offline_queue_v2";
 const MAX_RETRIES = 3;
 
 function loadQueue(): QueueAction[] {
@@ -80,15 +81,19 @@ async function executeAction(
 
 export async function syncQueue(
   client: { patch: (url: string, data: unknown) => Promise<unknown> },
+  currentUserId: string,
   onProgress?: (done: number, total: number) => void
-): Promise<{ synced: number; failed: number }> {
+): Promise<{ synced: number; failed: number; skipped: number }> {
   const queue = loadQueue();
   const pending = queue.filter(
-    (a) => a.status === "pending" || (a.status === "error" && a.retryCount < MAX_RETRIES)
+    (a) =>
+      (a.status === "pending" || (a.status === "error" && a.retryCount < MAX_RETRIES)) &&
+      a.userId === currentUserId
   );
 
   let synced = 0;
   let failed = 0;
+  const skipped = queue.filter((a) => a.userId !== currentUserId && a.status === "pending").length;
 
   for (const action of pending) {
     const idx = queue.findIndex((a) => a.id === action.id);
@@ -113,5 +118,5 @@ export async function syncQueue(
     onProgress?.(synced + failed, pending.length);
   }
 
-  return { synced, failed };
+  return { synced, failed, skipped };
 }
