@@ -145,12 +145,14 @@ export default function TecnicoMobilePage() {
     return () => clearInterval(id);
   }, []);
 
+  const { data: me, isLoading: meLoading } = useCurrentUserMobile();
+
   // Sincroniza fila quando voltar online
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline || !me?.id) return;
     if (getPendingCount() === 0) return;
     setIsSyncing(true);
-    syncQueue(mobileApiClient, me?.id ?? "unknown")
+    syncQueue(mobileApiClient, me.id)
       .then(({ synced, failed }) => {
         clearDoneItems();
         setPendingSync(getPendingCount());
@@ -158,9 +160,7 @@ export default function TecnicoMobilePage() {
         if (failed > 0) toast.error(`${failed} ação(ões) falharam ao sincronizar.`);
       })
       .finally(() => setIsSyncing(false));
-  }, [isOnline]);
-
-  const { data: me, isLoading: meLoading } = useCurrentUserMobile();
+  }, [isOnline, me?.id]);
   const technicianId = me?.technician?.id ?? null;
 
   const {
@@ -451,8 +451,12 @@ export default function TecnicoMobilePage() {
       toast.error("Sem conexão. Aguardando rede.");
       return;
     }
+    if (!me?.id) {
+      toast.error("Erro: usuário não autenticado. Faça login novamente.");
+      return;
+    }
     setIsSyncing(true);
-    syncQueue(mobileApiClient, me?.id ?? "unknown")
+    syncQueue(mobileApiClient, me.id)
       .then(({ synced, failed }) => {
         clearDoneItems();
         setPendingSync(getPendingCount());

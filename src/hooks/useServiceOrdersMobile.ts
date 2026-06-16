@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { mobileApiClient } from "@/lib/api/mobile-client";
 import { enqueue } from "@/lib/mobile/offline-queue";
 import { getNetworkStatus } from "@/lib/mobile/network";
@@ -110,9 +111,10 @@ export function useCheckin(serviceOrderId: string) {
   const { data: me } = useCurrentUserMobile();
   return useMutation({
     mutationFn: async (payload: CheckinPayload) => {
+      if (!me?.id) throw new Error("Usuário não autenticado.");
+      const userId = me.id;
       const online = await getNetworkStatus();
       if (online === "offline") {
-        const userId = me?.id ?? "unknown";
         enqueue({ userId, serviceOrderId, type: "UPDATE_STATUS", payload: { status: "IN_PROGRESS" } });
         enqueue({ userId, serviceOrderId, type: "CHECKIN", payload: payload as unknown as Record<string, unknown> });
         return null;
@@ -127,6 +129,7 @@ export function useCheckin(serviceOrderId: string) {
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mobile", "orders"] }),
+    onError: () => toast.error("Erro: usuário não autenticado. Faça login novamente."),
   });
 }
 
@@ -149,10 +152,12 @@ export function useUpdateExecution(serviceOrderId: string) {
   const { data: me } = useCurrentUserMobile();
   return useMutation({
     mutationFn: async (payload: UpdateExecutionPayload) => {
+      if (!me?.id) throw new Error("Usuário não autenticado.");
+      const userId = me.id;
       const online = await getNetworkStatus();
       if (online === "offline") {
         enqueue({
-          userId: me?.id ?? "unknown",
+          userId,
           serviceOrderId,
           type: "UPDATE_EXECUTION",
           payload: payload as Record<string, unknown>,
@@ -166,6 +171,7 @@ export function useUpdateExecution(serviceOrderId: string) {
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mobile", "orders"] }),
+    onError: () => toast.error("Erro: usuário não autenticado. Faça login novamente."),
   });
 }
 
@@ -178,9 +184,10 @@ export function useCompleteOS(serviceOrderId: string) {
       checkoutLat?: number;
       checkoutLng?: number;
     }) => {
+      if (!me?.id) throw new Error("Usuário não autenticado.");
+      const userId = me.id;
       const online = await getNetworkStatus();
       if (online === "offline") {
-        const userId = me?.id ?? "unknown";
         enqueue({
           userId,
           serviceOrderId,
@@ -203,6 +210,7 @@ export function useCompleteOS(serviceOrderId: string) {
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mobile", "orders"] }),
+    onError: () => toast.error("Erro: usuário não autenticado. Faça login novamente."),
   });
 }
 
