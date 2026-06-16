@@ -2,22 +2,22 @@
 -- FASE 1: Remover dependências FK antes de qualquer alteração
 -- ============================================================
 
-ALTER TABLE "ServiceOrder" DROP CONSTRAINT IF EXISTS "ServiceOrder_clientId_fkey";
-ALTER TABLE "ServiceOrder" DROP CONSTRAINT IF EXISTS "ServiceOrder_technicianId_fkey";
-ALTER TABLE "OSItem" DROP CONSTRAINT IF EXISTS "OSItem_serviceOrderId_fkey";
-ALTER TABLE "OSItem" DROP CONSTRAINT IF EXISTS "OSItem_productId_fkey";
-ALTER TABLE "Payment" DROP CONSTRAINT IF EXISTS "Payment_serviceOrderId_fkey";
-ALTER TABLE "Payment" DROP CONSTRAINT IF EXISTS "Payment_clientId_fkey";
-ALTER TABLE "StockMovement" DROP CONSTRAINT IF EXISTS "StockMovement_productId_fkey";
-ALTER TABLE "StockMovement" DROP CONSTRAINT IF EXISTS "StockMovement_serviceOrderId_fkey";
-ALTER TABLE "MaterialRequest" DROP CONSTRAINT IF EXISTS "MaterialRequest_serviceOrderId_fkey";
-ALTER TABLE "MaterialRequest" DROP CONSTRAINT IF EXISTS "MaterialRequest_productId_fkey";
-ALTER TABLE "Chip" DROP CONSTRAINT IF EXISTS "Chip_clientId_fkey";
-ALTER TABLE "Chip" DROP CONSTRAINT IF EXISTS "Chip_serviceOrderId_fkey";
-ALTER TABLE "RefreshToken" DROP CONSTRAINT IF EXISTS "RefreshToken_userId_fkey";
-ALTER TABLE "PasswordResetToken" DROP CONSTRAINT IF EXISTS "PasswordResetToken_userId_fkey";
-ALTER TABLE "AuditLog" DROP CONSTRAINT IF EXISTS "AuditLog_userId_fkey";
-ALTER TABLE "Technician" DROP CONSTRAINT IF EXISTS "Technician_userId_fkey";
+DO $$ BEGIN ALTER TABLE "ServiceOrder" DROP CONSTRAINT IF EXISTS "ServiceOrder_clientId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "ServiceOrder" DROP CONSTRAINT IF EXISTS "ServiceOrder_technicianId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "OSItem" DROP CONSTRAINT IF EXISTS "OSItem_serviceOrderId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "OSItem" DROP CONSTRAINT IF EXISTS "OSItem_productId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "Payment" DROP CONSTRAINT IF EXISTS "Payment_serviceOrderId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "Payment" DROP CONSTRAINT IF EXISTS "Payment_clientId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "StockMovement" DROP CONSTRAINT IF EXISTS "StockMovement_productId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "StockMovement" DROP CONSTRAINT IF EXISTS "StockMovement_serviceOrderId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "MaterialRequest" DROP CONSTRAINT IF EXISTS "MaterialRequest_serviceOrderId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "MaterialRequest" DROP CONSTRAINT IF EXISTS "MaterialRequest_productId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "Chip" DROP CONSTRAINT IF EXISTS "Chip_clientId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "Chip" DROP CONSTRAINT IF EXISTS "Chip_serviceOrderId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "RefreshToken" DROP CONSTRAINT IF EXISTS "RefreshToken_userId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "PasswordResetToken" DROP CONSTRAINT IF EXISTS "PasswordResetToken_userId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "AuditLog" DROP CONSTRAINT IF EXISTS "AuditLog_userId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "Technician" DROP CONSTRAINT IF EXISTS "Technician_userId_fkey"; EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
 -- ============================================================
 -- FASE 2: Novos ENUMs
@@ -544,6 +544,17 @@ CREATE TABLE IF NOT EXISTS "ChipHistory" (
     "userId"         TEXT,
     "createdAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "ChipHistory_pkey" PRIMARY KEY ("id")
+);
+
+-- RefreshToken
+CREATE TABLE IF NOT EXISTS "RefreshToken" (
+    "id"        TEXT         NOT NULL,
+    "token"     TEXT         NOT NULL,
+    "userId"    TEXT         NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RefreshToken_pkey" PRIMARY KEY ("id")
 );
 
 -- FinancialMovement

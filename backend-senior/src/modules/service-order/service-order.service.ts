@@ -147,7 +147,7 @@ export class ServiceOrderService {
       if (!os) throw new NotFoundError('OS');
 
       if (user.role === 'TECHNICIAN') {
-        const tech = await tx.technician.findFirst({ where: { userId: user.id } });
+        const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
       }
 
@@ -319,7 +319,7 @@ export class ServiceOrderService {
       }
 
       if (user.role === 'TECHNICIAN') {
-        const tech = await tx.technician.findFirst({ where: { userId: user.id } });
+        const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
       }
 
@@ -374,17 +374,20 @@ export class ServiceOrderService {
   private async buildScopeWhere(user: RequestUser): Promise<Prisma.ServiceOrderWhereInput> {
     // Todos os roles não-técnico vêem todas as OS da empresa
     if (user.role !== 'TECHNICIAN') {
-      return { companyId: user.companyId };
+      return { companyId: user.companyId, deletedAt: null };
     }
 
     // Técnico vê somente OS onde technicianId aponta para o Technician vinculado a este user
-    const tech = await prisma.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
+    const tech = await prisma.technician.findFirst({
+      where: { userId: user.id, companyId: user.companyId },
+      select: { id: true },
+    });
     if (!tech) {
       // Técnico sem registro Technician — onde impossível garante lista vazia
-      return { companyId: user.companyId, id: 'impossible-scope-no-technician-record' };
+      return { companyId: user.companyId, id: 'impossible-scope-no-technician-record', deletedAt: null };
     }
 
-    return { companyId: user.companyId, technicianId: tech.id };
+    return { companyId: user.companyId, technicianId: tech.id, deletedAt: null };
   }
 
   // ─── LIST ─────────────────────────────────────────────────────────────────────

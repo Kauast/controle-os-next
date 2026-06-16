@@ -97,6 +97,8 @@ model PasswordResetToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // ─── TEAM ─────────────────────────────────────────────────────────────────────
@@ -129,6 +131,7 @@ model TeamMember {
   joinedAt     DateTime   @default(now())
 
   @@unique([teamId, technicianId])
+  @@index([technicianId])
 }
 
 // ─── TECHNICIAN ──────────────────────────────────────────────────────────────
@@ -271,6 +274,7 @@ model StockMovement {
   @@index([serviceOrderId])
   @@index([userId])
   @@index([type, createdAt])
+  @@index([companyId, createdAt])
 }
 
 enum MovementType {
@@ -306,6 +310,7 @@ enum ReservationStatus {
 
 model MaterialRequest {
   id             String        @id @default(cuid())
+  companyId      String
   serviceOrderId String
   serviceOrder   ServiceOrder  @relation(fields: [serviceOrderId], references: [id])
   productId      String
@@ -317,6 +322,11 @@ model MaterialRequest {
   reviewNote     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  @@index([companyId, status])
+  @@index([serviceOrderId])
+  @@index([productId])
+  @@index([status])
 }
 
 enum RequestStatus {
@@ -376,6 +386,8 @@ model ChipHistory {
   createdAt      DateTime @default(now())
 
   @@index([chipId])
+  @@index([serviceOrderId])
+  @@index([userId])
 }
 
 // ─── SERVICE ORDER ───────────────────────────────────────────────────────────
@@ -546,7 +558,7 @@ model Attachment {
   fileName        String
   originalName    String
   mimeType        String
-  fileSize        Int
+  fileSize        BigInt
   storageProvider String   @default("local")
   storagePath     String
   hash            String?
@@ -559,6 +571,7 @@ model Attachment {
   @@index([companyId])
   @@index([uploadedBy])
   @@index([createdAt])
+  @@index([serviceOrderId])
 }
 
 // ─── FINANCIAL ───────────────────────────────────────────────────────────────
@@ -676,6 +689,8 @@ model FinancialMovement {
 
   @@index([companyId, type, movementDate])
   @@index([companyId, category])
+  @@index([paymentId])
+  @@index([invoiceId])
 }
 
 enum FinancialMovementType {
