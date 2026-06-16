@@ -5,36 +5,23 @@ import { toast } from "sonner";
 import { mobileApiClient } from "@/lib/api/mobile-client";
 import { enqueue } from "@/lib/mobile/offline-queue";
 import { getNetworkStatus } from "@/lib/mobile/network";
+import type { OsExecution, OsClient } from "@/lib/domain/service-order";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface MobileClient {
-  id: string;
-  name: string;
-  phone?: string | null;
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-}
+/** @see OsClient in src/lib/domain/service-order.ts */
+export type MobileClient = OsClient;
 
-export interface MobileExecution {
-  checkinAt?: string | null;
-  checkoutAt?: string | null;
-  checkinLat?: number | null;
-  checkinLng?: number | null;
-  checkoutLat?: number | null;
-  checkoutLng?: number | null;
-  /** @deprecated Use photoAttachmentIds. Mantido enquanto o backend migra. */
-  photoUrls?: string[];
-  /** IDs dos anexos de foto (novo contrato). Download via /api/attachments/:id/download. */
-  photoAttachmentIds?: string[];
-  /** @deprecated Use signatureAttachmentId. Mantido enquanto o backend migra. */
-  clientSignature?: string | null;
-  /** ID do anexo de assinatura (novo contrato). */
-  signatureAttachmentId?: string | null;
-  workDoneNotes?: string | null;
-}
+/** @see OsExecution in src/lib/domain/service-order.ts */
+export type MobileExecution = OsExecution;
 
+/**
+ * Service Order shape returned by the mobile API endpoints.
+ * Uses the canonical sub-types (OsClient, OsExecution) from the domain layer.
+ *
+ * NOTE: `number` is numeric here (legacy mobile API contract).
+ * `openingDate`/`dueDate` are mobile-specific field names.
+ */
 export interface MobileServiceOrder {
   id: string;
   number: number;

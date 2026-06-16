@@ -1,13 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { toast } from "sonner";
+import type { OsPriority } from "@/lib/domain/service-order";
 
+/**
+ * Web admin API shape for a Service Order.
+ * Uses OsPriority from the canonical domain type.
+ *
+ * NOTE: This is NOT ServiceOrderCanonical — the web admin API has different
+ * field names (e.g. `chipId` vs `chipIccid`, flat execution fields vs nested).
+ */
 export interface ServiceOrder {
   id: string;
   number: number;
   status: string;
   team: string;
-  priority: "NORMAL" | "WARNING" | "HIGH";
+  priority: OsPriority;
   scheduledTime?: string;
   scheduledStart?: string | null;
   description?: string;
@@ -45,7 +53,7 @@ export interface CreateServiceOrderInput {
   technicianId?: string;
   description?: string;
   team?: string;
-  priority?: "NORMAL" | "WARNING" | "HIGH";
+  priority?: OsPriority;
   scheduledTime?: string;
   items?: Array<{
     description: string;
