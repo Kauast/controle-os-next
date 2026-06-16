@@ -21,14 +21,15 @@ model Company {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
-  users         User[]
-  clients       Client[]
-  technicians   Technician[]
-  teams         Team[]
-  serviceOrders ServiceOrder[]
-  products      Product[]
-  chips         Chip[]
-  auditLogs     AuditLog[]
+  users              User[]
+  clients            Client[]
+  technicians        Technician[]
+  teams              Team[]
+  serviceOrders      ServiceOrder[]
+  products           Product[]
+  chips              Chip[]
+  auditLogs          AuditLog[]
+  financialMovements FinancialMovement[]
 }
 
 
@@ -663,6 +664,7 @@ enum PaymentStatus {
 model FinancialMovement {
   id           String                @id @default(cuid())
   companyId    String
+  company      Company               @relation(fields: [companyId], references: [id])
   type         FinancialMovementType
   category     String
   description  String
