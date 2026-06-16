@@ -37,3 +37,6 @@ docker-compose.override.yml
 
 # ── npm ──
 npm-debug.log*
+
+# ── Legacy standalone app copy (if present on VPS, not part of build) ──
+app/
