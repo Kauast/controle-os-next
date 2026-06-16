@@ -19,6 +19,7 @@ const ALLOWED_PREFIXES = new Set([
   "ai",
   "attachments",
   "teams",
+  "sync",
 ]);
 
 const BLOCKED_PREFIXES = new Set(["metrics", "health", "internal", "admin"]);
@@ -59,6 +60,13 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
 
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Repassa headers seguros usados por idempotência/concorrência/rastreio.
+  const FORWARD_HEADERS = ["idempotency-key", "if-match", "x-request-id"];
+  for (const h of FORWARD_HEADERS) {
+    const v = request.headers.get(h);
+    if (v) headers[h] = v;
+  }
 
   const contentType = request.headers.get("content-type");
 
