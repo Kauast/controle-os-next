@@ -144,7 +144,7 @@ export class ServiceOrderService {
       if (!os) throw new NotFoundError('OS');
 
       if (user.role === 'TECHNICIAN') {
-        const tech = await tx.technician.findFirst({ where: { userId: user.id } });
+        const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
       }
 
@@ -245,7 +245,7 @@ export class ServiceOrderService {
       });
 
       return tx.serviceOrder.findFirst({
-        where: { id },
+        where: { id, companyId: user.companyId },
         include: { client: true, technician: true, team: true, items: true },
       });
     });
@@ -298,7 +298,7 @@ export class ServiceOrderService {
       await audit({ companyId: user.companyId, userId: user.id, entity: 'ServiceOrder', entityId: id, action: 'OS_ATRIBUIDA', before, after: input });
 
       return tx.serviceOrder.findFirst({
-        where: { id },
+        where: { id, companyId: user.companyId },
         include: { client: true, technician: true, team: true },
       });
     });
@@ -315,7 +315,7 @@ export class ServiceOrderService {
       }
 
       if (user.role === 'TECHNICIAN') {
-        const tech = await tx.technician.findFirst({ where: { userId: user.id } });
+        const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
       }
 
@@ -361,7 +361,7 @@ export class ServiceOrderService {
       });
 
       return tx.serviceOrder.findFirst({
-        where: { id },
+        where: { id, companyId: user.companyId },
         include: { execution: true, client: true, technician: true },
       });
     });
@@ -495,6 +495,7 @@ export class ServiceOrderService {
     if (!technician.isActive) throw new AppError('Técnico inativo', 422);
 
     const where: Prisma.ServiceOrderWhereInput = {
+      companyId,
       technicianId,
       status: 'IN_PROGRESS',
     };
