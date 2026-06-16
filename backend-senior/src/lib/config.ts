@@ -8,6 +8,37 @@ export function validateEnv(): void {
       `Consulte backend-senior/.env.example para a lista completa.`,
     );
   }
+
+  // ETAPA 2: METRICS_TOKEN obrigatório em produção — expor /metrics sem token vaza dados de infra
+  if (process.env.NODE_ENV === 'production' && !process.env.METRICS_TOKEN) {
+    throw new Error(
+      'FATAL: METRICS_TOKEN não definido. Em produção o endpoint /metrics deve ser protegido. ' +
+      'Defina METRICS_TOKEN no ambiente ou desative o endpoint.',
+    );
+  }
+
+  // ETAPA 3: APP_URL obrigatória em produção e deve ser URL válida
+  const appUrl = process.env.APP_URL;
+  if (process.env.NODE_ENV === 'production') {
+    if (!appUrl) {
+      throw new Error(
+        'FATAL: APP_URL não definida. Em produção esta variável é obrigatória ' +
+        'para geração segura de links de reset de senha (previne Host Header Injection).',
+      );
+    }
+    try {
+      new URL(appUrl);
+    } catch {
+      throw new Error(`FATAL: APP_URL inválida: "${appUrl}". Deve ser uma URL completa (ex: https://seu-dominio.com).`);
+    }
+  } else if (appUrl) {
+    // Em dev/test: se definida, valida mesmo assim
+    try {
+      new URL(appUrl);
+    } catch {
+      throw new Error(`APP_URL inválida: "${appUrl}". Deve ser uma URL completa.`);
+    }
+  }
 }
 
 export const config = {
