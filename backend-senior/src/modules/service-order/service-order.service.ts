@@ -234,7 +234,7 @@ export class ServiceOrderService {
 
       // Consumir reservas ao concluir
       if (input.status === 'COMPLETED') {
-        await stockService.consumeReservation(id, user.id);
+        await stockService.consumeReservation(id, user.id, tx);
       }
 
       await audit({
@@ -470,9 +470,16 @@ export class ServiceOrderService {
     if (os.status === 'COMPLETED') throw new AppError('Não é possível excluir uma OS concluída', 422);
     if (os.status === 'IN_PROGRESS') throw new AppError('Cancele a OS antes de excluir', 422);
 
-    await prisma.serviceOrder.update({
-      where: { id },
-      data: { deletedAt: new Date(), deletedBy: user.id },
+    await prisma.$transaction(async (tx) => {
+      await tx.serviceOrder.update({
+        where: { id },
+        data: { deletedAt: new Date(), deletedBy: user.id },
+      });
+
+      await tx.stockReservation.updateMany({
+        where: { serviceOrderId: id, status: 'ACTIVE' },
+        data: { status: 'RELEASED', releasedAt: new Date() },
+      });
     });
 
     await audit({ companyId: user.companyId, userId: user.id, entity: 'ServiceOrder', entityId: id, action: 'OS_EXCLUIDA', before: { status: os.status, number: os.number } });

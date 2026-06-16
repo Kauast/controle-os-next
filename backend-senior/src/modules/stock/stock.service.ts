@@ -31,7 +31,7 @@ export class StockService {
 
     const lastMovement = await db.stockMovement.findFirst({
       where: { productId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: { balanceAfter: true },
     });
 
@@ -137,21 +137,21 @@ export class StockService {
   }
 
   // Consome a reserva (transforma em saída real) quando a OS é concluída
-  async consumeReservation(serviceOrderId: string, userId?: string): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      const reservations = await tx.stockReservation.findMany({
+  async consumeReservation(serviceOrderId: string, userId?: string, tx?: TxClient): Promise<void> {
+    const execute = async (innerTx: TxClient) => {
+      const reservations = await innerTx.stockReservation.findMany({
         where: { serviceOrderId, status: 'ACTIVE' },
       });
 
       for (const res of reservations) {
-        await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${res.productId} AND "companyId" = ${res.companyId} AND "deletedAt" IS NULL FOR UPDATE`;
-        const balance = await this.getBalance(res.productId, tx);
+        await innerTx.$queryRaw`SELECT id FROM "Product" WHERE id = ${res.productId} AND "companyId" = ${res.companyId} AND "deletedAt" IS NULL FOR UPDATE`;
+        const balance = await this.getBalance(res.productId, innerTx);
 
         if (balance.physical < res.quantity) {
           throw new InsufficientStockError(res.productId, balance.physical, res.quantity);
         }
 
-        await tx.stockMovement.create({
+        await innerTx.stockMovement.create({
           data: {
             companyId: res.companyId,
             productId: res.productId,
@@ -165,22 +165,29 @@ export class StockService {
           },
         });
 
-        await tx.stockReservation.update({
+        await innerTx.stockReservation.update({
           where: { id: res.id },
           data: { status: 'CONSUMED', releasedAt: new Date() },
         });
 
-        await tx.$executeRaw`
+        await innerTx.$executeRaw`
           UPDATE "Product" SET "version" = "version" + 1, "updatedAt" = NOW()
           WHERE id = ${res.productId}
         `;
       }
-    });
+    };
+
+    if (tx) {
+      await execute(tx);
+    } else {
+      await prisma.$transaction(execute);
+    }
   }
 
   // Libera reserva quando OS é cancelada
-  async releaseReservation(serviceOrderId: string, userId?: string): Promise<void> {
-    await prisma.stockReservation.updateMany({
+  async releaseReservation(serviceOrderId: string, userId?: string, tx?: TxClient): Promise<void> {
+    const db = tx ?? prisma;
+    await db.stockReservation.updateMany({
       where: { serviceOrderId, status: 'ACTIVE' },
       data: { status: 'RELEASED', releasedAt: new Date() },
     });
