@@ -144,6 +144,28 @@ export default async function uploadRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'serviceOrderId inválido. Deve ser um CUID válido.' });
       }
 
+      if (serviceOrderIdResult.data) {
+        const os = await prisma.serviceOrder.findFirst({
+          where: { id: serviceOrderIdResult.data, companyId: user.companyId },
+          select: { id: true, technicianId: true },
+        });
+        if (!os) {
+          return reply.status(404).send({ error: 'Ordem de serviço não encontrada' });
+        }
+        if (user.role === 'TECHNICIAN') {
+          const tech = await prisma.technician.findFirst({
+            where: { userId: user.id, companyId: user.companyId },
+            select: { id: true },
+          });
+          if (!tech) {
+            throw new ForbiddenError('Técnico não vinculado');
+          }
+          if (os.technicianId !== tech.id) {
+            return reply.status(404).send({ error: 'Ordem de serviço não encontrada' });
+          }
+        }
+      }
+
       const attachment = await attachmentService.create({
         entityType,
         entityId,
