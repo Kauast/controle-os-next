@@ -9,12 +9,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
+  const refreshToken = (body as { refreshToken?: string }).refreshToken;
+  if (!refreshToken) {
+    return NextResponse.json({ error: "refreshToken obrigatório" }, { status: 400 });
+  }
+
   let res: Response;
   try {
-    res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    res = await fetch(`${BACKEND_URL}/api/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ refreshToken }),
     });
   } catch {
     return NextResponse.json({ error: "Serviço indisponível." }, { status: 503 });
@@ -26,7 +31,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: res.status });
   }
 
-  // Retorna accessToken, refreshToken e user — o app nativo guarda no Capacitor Preferences
   return NextResponse.json({
     accessToken: (data as { accessToken?: string }).accessToken,
     refreshToken: (data as { refreshToken?: string }).refreshToken,

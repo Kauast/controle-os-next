@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 
 const TOKEN_KEY = "mobile_auth_token";
+const REFRESH_TOKEN_KEY = "mobile_refresh_token";
 
 async function getPreferences() {
   if (!Capacitor.isNativePlatform()) return null;
@@ -37,6 +38,34 @@ export async function clearToken(): Promise<void> {
     await prefs.remove({ key: TOKEN_KEY });
   } else if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+export async function getRefreshToken(): Promise<string | null> {
+  const prefs = await getPreferences();
+  if (prefs) {
+    const { value } = await prefs.get({ key: REFRESH_TOKEN_KEY });
+    return value;
+  }
+  if (typeof window !== "undefined") return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return null;
+}
+
+export async function setRefreshToken(token: string): Promise<void> {
+  const prefs = await getPreferences();
+  if (prefs) {
+    await prefs.set({ key: REFRESH_TOKEN_KEY, value: token });
+  } else if (typeof window !== "undefined") {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  }
+}
+
+export async function clearRefreshToken(): Promise<void> {
+  const prefs = await getPreferences();
+  if (prefs) {
+    await prefs.remove({ key: REFRESH_TOKEN_KEY });
+  } else if (typeof window !== "undefined") {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 }
 

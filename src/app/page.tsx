@@ -86,10 +86,15 @@ export default function Home() {
 
   if (!hydrated || authLoading) {
     return (
-      <div className="grid min-h-screen place-items-center bg-dark text-muted">
-        <div className="flex flex-col items-center gap-3">
-          <div className="size-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-          <p className="text-sm">Carregando...</p>
+      <div className="grid min-h-screen place-items-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-7 animate-spin rounded-full border border-white/20 border-t-white/80" />
+          <p
+            className="text-xs tracking-[0.2em] uppercase"
+            style={{ fontFamily: "var(--font-mono)", color: "var(--color-muted)" }}
+          >
+            Carregando...
+          </p>
         </div>
       </div>
     );
@@ -97,17 +102,29 @@ export default function Home() {
 
   if (role === "tecnico") {
     return (
-      <div className="grid min-h-screen place-items-center bg-dark px-5">
-        <div className="flex flex-col items-center gap-4 text-center max-w-xs">
-          <div className="size-12 rounded-full bg-teal/10 grid place-items-center">
-            <Smartphone className="size-6 text-teal" />
+      <div className="grid min-h-screen place-items-center bg-black px-5">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col items-center gap-5 text-center max-w-xs"
+        >
+          <div className="size-12 rounded-[var(--radius-md)] border border-white/10 bg-white/[0.06] grid place-items-center">
+            <Smartphone className="size-5 text-white" />
           </div>
-          <h2 className="text-lg font-bold text-ink">Acesso pelo App do Técnico</h2>
-          <p className="text-sm text-muted">Sua conta é do tipo técnico. Use o app mobile para acessar suas ordens de serviço.</p>
-          <Link href="/tecnico-mobile" className="inline-flex items-center gap-2 rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-dark transition hover:bg-teal/90">
+          <div>
+            <h2 className="text-base font-bold text-white">Acesso pelo App do Técnico</h2>
+            <p className="mt-1.5 text-sm" style={{ color: "var(--color-muted)" }}>
+              Sua conta é do tipo técnico. Use o app mobile para acessar suas ordens de serviço.
+            </p>
+          </div>
+          <Link
+            href="/tecnico-mobile"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-white px-5 py-2.5 text-sm font-semibold text-black transition-all hover:bg-[#E8E8E8] active:scale-[0.97]"
+          >
             <Smartphone className="size-4" /> Abrir App do Técnico
           </Link>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -115,8 +132,7 @@ export default function Home() {
   const current = canAccessSection(section, role) ? section : defaultSection(role);
 
   return (
-    <div className="relative flex min-h-screen bg-dark text-ink">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_right,rgba(20,184,166,0.04),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(20,184,166,0.02),transparent_30%)]" />
+    <div className="relative flex min-h-screen bg-black text-white">
 
       <Sidebar />
       <MobileSidebar />
@@ -140,7 +156,8 @@ export default function Home() {
 
         <Link
           href="/tecnico"
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-xl bg-panel px-4 py-3 text-sm font-semibold text-ink shadow-lg border border-line transition hover:bg-panel-soft lg:hidden"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-xs font-semibold text-white transition-all hover:bg-white/8 lg:hidden"
+          style={{ background: "var(--color-surface-2)", borderColor: "var(--color-line-strong)" }}
         >
           <Smartphone className="size-4" /> App do técnico
         </Link>

@@ -38,7 +38,7 @@ const buttonVariants = cva(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold",
     "transition-all duration-[120ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]",
     "select-none touch-manipulation",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1220]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
     "disabled:pointer-events-none disabled:opacity-45 disabled:cursor-not-allowed",
     "active:scale-[0.97]",
     "[&_svg]:size-4 [&_svg]:shrink-0",
@@ -47,7 +47,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: [
-          "bg-teal text-[#0B1220] rounded-[var(--radius-sm)]",
+          "bg-teal text-black rounded-[var(--radius-sm)]",
           "hover:bg-teal-bright",
           "active:brightness-95",
           "focus-visible:ring-teal",
@@ -76,7 +76,7 @@ const buttonVariants = cva(
         ].join(" "),
 
         amber: [
-          "bg-amber text-[#0B1220] rounded-[var(--radius-sm)]",
+          "bg-amber text-black rounded-[var(--radius-sm)]",
           "hover:bg-[var(--color-amber-bright)]",
           "active:brightness-90",
           "focus-visible:ring-amber",

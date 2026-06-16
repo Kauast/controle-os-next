@@ -106,17 +106,17 @@ export function SidebarNav({ section, role, onNavigate }: SidebarNavProps) {
                   onClick={() => onNavigate(item.key)}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "relative flex items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/50",
+                    "relative flex items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2.5 text-left text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30",
                     isActive
-                      ? "bg-teal text-black shadow-sm"
-                      : "text-muted hover:bg-white/8 hover:text-ink",
+                      ? "bg-white text-black"
+                      : "text-muted hover:bg-white/[0.06] hover:text-white",
                   )}
                 >
                   {isActive && (
                     <motion.span
                       layoutId="nav-active"
-                      className="absolute inset-0 -z-10 rounded-[12px] bg-teal"
-                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      className="absolute inset-0 -z-10 rounded-[var(--radius-md)] bg-white"
+                      transition={{ type: "spring", stiffness: 500, damping: 38 }}
                     />
                   )}
                   <Icon className={cn("size-[15px] shrink-0", isActive ? "text-black" : "text-muted")} aria-hidden="true" />
@@ -136,14 +136,14 @@ export function Sidebar() {
   const { section, setSection } = useUIStore();
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-6 border-r border-line bg-panel-soft p-4 lg:flex">
+    <aside className="hidden w-60 shrink-0 flex-col gap-6 border-r p-4 lg:flex" style={{ borderColor: "var(--color-line)", background: "var(--color-surface-0)" }}>
       <div className="flex items-center gap-3 px-1">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-          <Image src="/logo.svg" alt="RB Segurança" width={28} height={28} className="rounded-lg" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-white/10 bg-white/[0.06]">
+          <Image src="/logo.svg" alt="RB Segurança" width={24} height={24} className="rounded-sm" />
         </div>
         <div className="leading-tight">
-          <p className="text-base font-black tracking-tight text-ink">RB</p>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-muted">Segurança</p>
+          <p className="text-sm font-bold tracking-[0.06em] text-white">RB</p>
+          <p className="text-[9px] font-medium uppercase tracking-[0.28em]" style={{ fontFamily: "var(--font-mono)", color: "var(--color-muted)" }}>Segurança</p>
         </div>
       </div>
 
@@ -153,9 +153,9 @@ export function Sidebar() {
         onNavigate={(key) => setSection(key, null)}
       />
 
-      <div className="rounded-[12px] border border-line bg-panel/60 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted/60">Perfil ativo</p>
-        <p className="mt-0.5 text-sm font-semibold text-ink">{roleLabel[role] ?? role}</p>
+      <div className="rounded-[var(--radius-md)] border p-3" style={{ borderColor: "var(--color-line)", background: "var(--color-surface-2)" }}>
+        <p className="text-[9px] font-medium uppercase tracking-[0.2em]" style={{ fontFamily: "var(--font-mono)", color: "var(--color-disabled)" }}>Perfil ativo</p>
+        <p className="mt-1 text-sm font-semibold text-white">{roleLabel[role] ?? role}</p>
       </div>
     </aside>
   );

@@ -7,7 +7,7 @@ import { AlertCircle, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { LionShield } from "@/components/layout/LionShield";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { storeMobileToken } from "@/lib/api/mobile-client";
+import { storeMobileTokens } from "@/lib/api/mobile-client";
 
 export default function TecnicoMobileLoginPage() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function TecnicoMobileLoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data: { accessToken?: string; message?: string } =
+      const data: { accessToken?: string; refreshToken?: string; message?: string } =
         await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -43,8 +43,7 @@ export default function TecnicoMobileLoginPage() {
         return;
       }
 
-      // Usa Capacitor Preferences no app nativo, localStorage no navegador
-      await storeMobileToken(token);
+      await storeMobileTokens(token, data.refreshToken);
       router.replace("/tecnico-mobile/");
     } catch {
       setError("Erro de conexão. Verifique o servidor.");

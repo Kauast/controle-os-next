@@ -30,6 +30,8 @@ const badgeVariants = cva(
     "inline-flex items-center gap-1 rounded-[var(--radius-xs)] border",
     "font-semibold leading-none select-none",
     "[&_svg]:size-3 [&_svg]:shrink-0",
+    // font-mono para leitura de dados (rule: number-tabular, label-eyebrow)
+    "[font-family:var(--font-mono)]",
   ].join(" "),
   {
     variants: {
