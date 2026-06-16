@@ -119,7 +119,7 @@ export class TechnicianService {
         user: { select: { id: true, name: true, email: true, role: true } },
         teamMemberships: { include: { team: { select: { id: true, name: true } } } },
         serviceOrders: {
-          where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] } },
+          where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] }, deletedAt: null },
           select: { id: true, number: true, status: true, priority: true, dueDate: true },
         },
       },

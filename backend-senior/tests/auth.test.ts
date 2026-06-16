@@ -12,7 +12,7 @@ vi.mock('../src/lib/prisma', () => ({
       create: vi.fn(),
     },
     company: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({ id: 'company-1', active: true }),
     },
     refreshToken: {
       count: vi.fn().mockResolvedValue(0),
@@ -85,7 +85,7 @@ describe('POST /api/auth/register', () => {
     vi.mocked(prisma.user.findFirst)
       .mockResolvedValueOnce({ passwordChangedAt: null, active: true } as never)
       .mockResolvedValueOnce(null); // sem duplicata
-    vi.mocked(prisma.company.findUnique).mockResolvedValue({ id: 'company-1', active: true } as never);
+    vi.mocked(prisma.company.findFirst).mockResolvedValue({ id: 'company-1', active: true } as never);
     vi.mocked(prisma.user.create).mockResolvedValue({
       id: 'new-id',
       name: null,

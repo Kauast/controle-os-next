@@ -40,7 +40,7 @@ export class AuthService {
     const existing = await prisma.user.findFirst({ where: { email: data.email, companyId: data.companyId } });
     if (existing) throw new AppError('E-mail já cadastrado nesta empresa', 409);
 
-    const company = await prisma.company.findUnique({ where: { id: data.companyId } });
+    const company = await prisma.company.findFirst({ where: { id: data.companyId, deletedAt: null } });
     if (!company || !company.active) throw new AppError('Empresa não encontrada ou inativa', 404);
 
     const hashed = await bcrypt.hash(data.password, 12);
