@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ServiceOrder {
+  id             String      @id @default(cuid())
+  number         String      @unique
+  companyId      String
+  status         OrderStatus @default(PENDING_RESERVATION)
+  priority       Priority    @default(MEDIUM)
+  clientId       String
+  clientName     String
+  clientBlocked  Boolean     @default(false)
+  technicianId   String?
+  technicianName String?
+  teamId         String?
+  description    String
+  internalNote   String?
+  scheduledDate  DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  sagaState      Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+
+  items      ServiceOrderItem[]
+  schedules  ServiceOrderSchedule[]
+  executions ServiceOrderExecution[]
+  history    ServiceOrderHistory[]
+  events     ServiceOrderEvent[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, technicianId])
+}
+
+model ServiceOrderItem {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  type           ItemType
+  description    String
+  quantity       Float        @default(1)
+  unitPrice      Float
+  totalPrice     Float
+  productId      String?
+  reservationId  String?
+  createdAt      DateTime     @default(now())
+}
+
+model ServiceOrderSchedule {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  scheduledStart DateTime
+  scheduledEnd   DateTime?
+  technicianId   String?
+  note           String?
+  createdAt      DateTime     @default(now())
+}
+
+model ServiceOrderExecution {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  technicianId   String
+  checkinAt      DateTime?
+  checkoutAt     DateTime?
+  checkinLat     Float?
+  checkinLng     Float?
+  checkoutLat    Float?
+  checkoutLng    Float?
+  signatureUrl   String?
+  note           String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ServiceOrderHistory {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  fromStatus     OrderStatus?
+  toStatus       OrderStatus
+  note           String?
+  userId         String
+  userName       String
+  createdAt      DateTime     @default(now())
+}
+
+model ServiceOrderEvent {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  type           String
+  payload        Json
+  createdAt      DateTime     @default(now())
+}
+
+enum OrderStatus {
+  PENDING_RESERVATION
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  WAITING_PARTS
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ItemType {
+  SERVICE
+  PRODUCT
+  EXPENSE
+}

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma, TxClient } from '../../lib/prisma';
-import { AppError, NotFoundError, InsufficientStockError, ConcurrencyError } from '../../shared/errors';
+import { AppError, NotFoundError, InsufficientStockError } from '../../shared/errors';
 import { audit } from '../audit/audit.service';
 import { parsePagination, buildPaginatedResult } from '../../shared/pagination';
 

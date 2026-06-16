@@ -78,7 +78,7 @@ enum Role {
 
 model RefreshToken {
   id        String    @id @default(cuid())
-  token     String    @unique
+  tokenHash String    @unique
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
@@ -86,7 +86,7 @@ model RefreshToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
-  @@index([token])
+  @@index([tokenHash])
 }
 
 model PasswordResetToken {
@@ -500,6 +500,9 @@ model ServiceOrderExecution {
   workDoneNotes   String?
   photoUrls       String[]     @default([])
   clientSignature String?
+  // Novo contrato: anexos privados (Attachment) em vez de URLs públicas.
+  photoAttachmentIds    String[] @default([])
+  signatureAttachmentId String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }

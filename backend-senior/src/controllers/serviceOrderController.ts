@@ -91,7 +91,7 @@ export class ServiceOrderController {
       search,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20,
-    });
+    }, user);
     return reply.send(result);
   }
 
@@ -109,7 +109,7 @@ export class ServiceOrderController {
     reply: FastifyReply
   ) {
     const user = request.user as RequestUser;
-    const result = await service.findById(request.params.id, user.companyId);
+    const result = await service.findById(request.params.id, user);
     return reply.send(result);
   }
 }

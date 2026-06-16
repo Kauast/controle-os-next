@@ -116,6 +116,10 @@ export class AuthService {
     };
   }
 
+  private hashToken(raw: string): string {
+    return crypto.createHash('sha256').update(raw).digest('hex');
+  }
+
   async issueRefreshToken(userId: string): Promise<string> {
     // Limita refresh tokens ativos por usuário (prevenção de abuso)
     const activeCount = await prisma.refreshToken.count({ where: { userId, revokedAt: null } });
@@ -126,24 +130,42 @@ export class AuthService {
       });
     }
 
-    const token = crypto.randomBytes(40).toString('hex');
+    const rawToken = crypto.randomBytes(40).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
     const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60_000);
-    await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
-    return token;
+    // Persiste apenas o hash — o token cru nunca toca o banco
+    await prisma.refreshToken.create({ data: { tokenHash, userId, expiresAt } });
+    return rawToken;
   }
 
-  async rotateRefreshToken(token: string) {
+  async rotateRefreshToken(rawToken: string) {
+    const tokenHash = this.hashToken(rawToken);
+
+    // Usa findUnique pois RefreshToken não tem soft-delete (não está em SOFT_DELETE_MODELS)
     const record = await prisma.refreshToken.findUnique({
-      where: { token },
+      where: { tokenHash },
       include: { user: { include: { company: true } } },
     });
 
-    if (!record || record.revokedAt || record.expiresAt < new Date()) {
+    // Token não encontrado — resposta genérica (não revela motivo)
+    if (!record) {
+      throw new AppError('Refresh token inválido ou expirado', 401);
+    }
+
+    // Detecção de reuse: token já revogado foi reapresentado → possível roubo de token.
+    // Revogar TODOS os tokens ativos do usuário como defesa.
+    if (record.revokedAt) {
+      await this.revokeAllUserTokens(record.userId);
+      throw new AppError('Refresh token inválido ou expirado', 401);
+    }
+
+    // Token expirado → rejeita sem revelar motivo específico
+    if (record.expiresAt < new Date()) {
       throw new AppError('Refresh token inválido ou expirado', 401);
     }
 
     if (!record.user.active || !record.user.company?.active) {
-      throw new AppError('Usuário ou empresa inativos', 401);
+      throw new AppError('Refresh token inválido ou expirado', 401);
     }
 
     // Revogar token atual (rotação — previne reutilização)
@@ -163,8 +185,9 @@ export class AuthService {
     };
   }
 
-  async revokeRefreshToken(token: string) {
-    await prisma.refreshToken.updateMany({ where: { token, revokedAt: null }, data: { revokedAt: new Date() } });
+  async revokeRefreshToken(rawToken: string) {
+    const tokenHash = this.hashToken(rawToken);
+    await prisma.refreshToken.updateMany({ where: { tokenHash, revokedAt: null }, data: { revokedAt: new Date() } });
   }
 
   async revokeAllUserTokens(userId: string) {

@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ProductCategory {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  products  Product[]
+  createdAt DateTime  @default(now())
+
+  @@index([companyId])
+}
+
+model Product {
+  id               String            @id @default(cuid())
+  companyId        String
+  categoryId       String?
+  category         ProductCategory?  @relation(fields: [categoryId], references: [id])
+  name             String
+  unit             String
+  minStock         Float             @default(0)
+  currentBalance   Float             @default(0)
+  price            Float?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  movements        StockMovement[]
+  reservations     StockReservation[]
+  materialRequests MaterialRequest[]
+
+  @@index([companyId])
+}
+
+model StockMovement {
+  id             String       @id @default(cuid())
+  companyId      String
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id])
+  type           MovementType
+  quantity       Float
+  balanceBefore  Float
+  balanceAfter   Float
+  note           String?
+  serviceOrderId String?
+  userId         String
+  userName       String
+  createdAt      DateTime     @default(now())
+
+  @@index([companyId, productId])
+}
+
+model StockReservation {
+  id             String            @id @default(cuid())
+  companyId      String
+  productId      String
+  product        Product           @relation(fields: [productId], references: [id])
+  serviceOrderId String
+  quantity       Float
+  status         ReservationStatus @default(ACTIVE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([companyId, serviceOrderId])
+}
+
+model MaterialRequest {
+  id             String        @id @default(cuid())
+  companyId      String
+  serviceOrderId String
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id])
+  quantity       Float
+  status         RequestStatus @default(PENDING)
+  note           String?
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  RESERVATION_RELEASE
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

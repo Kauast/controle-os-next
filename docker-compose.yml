@@ -92,6 +92,32 @@ services:
     networks:
       - app
 
+  migrate:
+    build:
+      context: ./backend-senior
+      dockerfile: Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-controle_os}?pgbouncer=true
+      DIRECT_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-controle_os}
+      NODE_ENV: production
+    # Sobrescrever entrypoint: remover script, executar APENAS migração
+    entrypoint: ["sh", "-c", "npx prisma migrate deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+    networks:
+      - app
+
   backend:
     build:
       context: ./backend-senior
@@ -105,6 +131,7 @@ services:
       PORT: 3333
       NODE_ENV: production
       ALLOWED_ORIGINS: https://${DOMAIN}
+      APP_URL: https://${DOMAIN}
       UPLOAD_DIR: /app/uploads
       UPLOAD_BASE_URL: https://${DOMAIN}/uploads
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
@@ -126,14 +153,17 @@ services:
     volumes:
       - ./uploads:/app/uploads
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # seed REMOVIDO do comando automático de produção
-    # para seed manual: docker compose exec backend npm run seed
-    command: >
-      sh -c "npx prisma migrate deploy && npm run start"
+    # Entrypoint script robusto que:
+    #   1. Aguarda PostgreSQL/PgBouncer/Redis ficarem prontos
+    #   2. Inicia aplicação Fastify
+    # Migrações são executadas pelo serviço 'migrate' one-shot ANTES deste
+    # Seed executado manualmente: docker compose exec backend npm run seed
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 3333 || exit 1"]
       interval: 30s

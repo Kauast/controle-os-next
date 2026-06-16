@@ -1,0 +1,564 @@
+version: "3.9"
+
+# =============================================================================
+# controle-os-next — Docker Compose para microservicos (desenvolvimento)
+#
+# Uso:
+#   docker compose -f docker-compose.microservices.yml up -d
+#   docker compose -f docker-compose.microservices.yml -f docker-compose.microservices.override.yml up -d
+#
+# Variaveis de ambiente: copie .env.docker para .env e ajuste.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Infraestrutura compartilhada
+  # ---------------------------------------------------------------------------
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: controle-os-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-admin}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - controle-os
+
+  redis:
+    image: redis:7-alpine
+    container_name: controle-os-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - controle-os
+
+  minio:
+    image: minio/minio:latest
+    container_name: controle-os-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - controle-os
+
+  # ---------------------------------------------------------------------------
+  # Bancos de dados — um PostgreSQL isolado por microservico
+  # ---------------------------------------------------------------------------
+
+  identity-db:
+    image: postgres:16-alpine
+    container_name: controle-os-identity-db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: identity
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - identity-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d identity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  customer-db:
+    image: postgres:16-alpine
+    container_name: controle-os-customer-db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: customer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - customer-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d customer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  chip-db:
+    image: postgres:16-alpine
+    container_name: controle-os-chip-db
+    restart: unless-stopped
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_DB: chip
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - chip-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d chip"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  inventory-db:
+    image: postgres:16-alpine
+    container_name: controle-os-inventory-db
+    restart: unless-stopped
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - inventory-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  workforce-db:
+    image: postgres:16-alpine
+    container_name: controle-os-workforce-db
+    restart: unless-stopped
+    ports:
+      - "5437:5432"
+    environment:
+      POSTGRES_DB: workforce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - workforce-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d workforce"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  service-order-db:
+    image: postgres:16-alpine
+    container_name: controle-os-service-order-db
+    restart: unless-stopped
+    ports:
+      - "5438:5432"
+    environment:
+      POSTGRES_DB: service_order
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - service-order-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d service_order"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  billing-db:
+    image: postgres:16-alpine
+    container_name: controle-os-billing-db
+    restart: unless-stopped
+    ports:
+      - "5439:5432"
+    environment:
+      POSTGRES_DB: billing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - billing-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d billing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  media-db:
+    image: postgres:16-alpine
+    container_name: controle-os-media-db
+    restart: unless-stopped
+    ports:
+      - "5440:5432"
+    environment:
+      POSTGRES_DB: media
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - media-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d media"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  notification-db:
+    image: postgres:16-alpine
+    container_name: controle-os-notification-db
+    restart: unless-stopped
+    ports:
+      - "5441:5432"
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notification"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - controle-os
+
+  # ---------------------------------------------------------------------------
+  # Microservicos — Node.js + Fastify + Prisma
+  # ---------------------------------------------------------------------------
+
+  identity-svc:
+    build:
+      context: ./services/identity
+      dockerfile: Dockerfile
+    container_name: controle-os-identity-svc
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@identity-db:5432/identity
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+    depends_on:
+      identity-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  customer-svc:
+    build:
+      context: ./services/customer
+      dockerfile: Dockerfile
+    container_name: controle-os-customer-svc
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@customer-db:5432/customer
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+    depends_on:
+      customer-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  chip-svc:
+    build:
+      context: ./services/chip
+      dockerfile: Dockerfile
+    container_name: controle-os-chip-svc
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@chip-db:5432/chip
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+    depends_on:
+      chip-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  inventory-svc:
+    build:
+      context: ./services/inventory
+      dockerfile: Dockerfile
+    container_name: controle-os-inventory-svc
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@inventory-db:5432/inventory
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3004/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  workforce-svc:
+    build:
+      context: ./services/workforce
+      dockerfile: Dockerfile
+    container_name: controle-os-workforce-svc
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@workforce-db:5432/workforce
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+    depends_on:
+      workforce-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3005/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  service-order-svc:
+    build:
+      context: ./services/service-order
+      dockerfile: Dockerfile
+    container_name: controle-os-service-order-svc
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      NODE_ENV: development
+      PORT: 3006
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@service-order-db:5432/service_order
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+      CUSTOMER_SVC_URL: http://customer-svc:3002
+      WORKFORCE_SVC_URL: http://workforce-svc:3005
+      INVENTORY_SVC_URL: http://inventory-svc:3004
+      CHIP_SVC_URL: http://chip-svc:3003
+    depends_on:
+      service-order-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3006/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  billing-svc:
+    build:
+      context: ./services/billing
+      dockerfile: Dockerfile
+    container_name: controle-os-billing-svc
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      NODE_ENV: development
+      PORT: 3007
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@billing-db:5432/billing
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3007/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  media-svc:
+    build:
+      context: ./services/media
+      dockerfile: Dockerfile
+    container_name: controle-os-media-svc
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      NODE_ENV: development
+      PORT: 3008
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@media-db:5432/media
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+      STORAGE_PROVIDER: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: controle-os-media
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_REGION: us-east-1
+    depends_on:
+      media-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3008/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+  notification-svc:
+    build:
+      context: ./services/notification
+      dockerfile: Dockerfile
+    container_name: controle-os-notification-svc
+    restart: unless-stopped
+    ports:
+      - "3009:3009"
+    environment:
+      NODE_ENV: development
+      PORT: 3009
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-dev}@notification-db:5432/notification
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-admin}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-mude-em-producao-use-32-chars}
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3009/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - controle-os
+
+# =============================================================================
+# Rede interna
+# =============================================================================
+
+networks:
+  controle-os:
+    driver: bridge
+
+# =============================================================================
+# Volumes persistentes
+# =============================================================================
+
+volumes:
+  rabbitmq-data:
+  redis-data:
+  minio-data:
+  identity-db-data:
+  customer-db-data:
+  chip-db-data:
+  inventory-db-data:
+  workforce-db-data:
+  service-order-db-data:
+  billing-db-data:
+  media-db-data:
+  notification-db-data:

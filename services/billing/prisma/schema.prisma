@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  companyId      String
+  serviceOrderId String?
+  clientId       String
+  clientName     String
+  status         InvoiceStatus @default(DRAFT)
+  subtotal       Float
+  discount       Float         @default(0)
+  total          Float
+  dueDate        DateTime?
+  issuedAt       DateTime?
+  cancelledAt    DateTime?
+  note           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  payments       Payment[]
+  movements      FinancialMovement[]
+
+  @@index([companyId])
+  @@index([companyId, clientId])
+  @@index([companyId, serviceOrderId])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  companyId      String
+  invoiceId      String
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id])
+  method         PaymentMethod
+  amount         Float
+  status         PaymentStatus @default(PENDING)
+  paidAt         DateTime?
+  cancelledAt    DateTime?
+  idempotencyKey String?       @unique
+  note           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([companyId, invoiceId])
+}
+
+model FinancialMovement {
+  id        String                @id @default(cuid())
+  companyId String
+  invoiceId String?
+  invoice   Invoice?              @relation(fields: [invoiceId], references: [id])
+  type      FinancialMovementType
+  amount    Float
+  note      String?
+  createdAt DateTime              @default(now())
+
+  @@index([companyId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  OVERDUE
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  BANK_TRANSFER
+  BOLETO
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum FinancialMovementType {
+  INCOME
+  EXPENSE
+  REFUND
+}

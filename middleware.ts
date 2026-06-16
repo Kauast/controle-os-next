@@ -26,8 +26,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    // Configuração crítica ausente — não deixar passar
+    if (isApiProxy) return NextResponse.json({ error: "Configuração inválida" }, { status: 503 });
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+    const secret = new TextEncoder().encode(jwtSecret);
     const { payload } = await jwtVerify(token, secret);
     const role = (payload as { role?: string }).role ?? "";
 

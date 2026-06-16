@@ -55,14 +55,3 @@ export function getMobileToken(): string | null {
   return null;
 }
 
-/** @deprecated Use storeMobileToken (async). Mantido para compatibilidade. */
-export function setMobileToken(token: string): void {
-  _token = token;
-  void setToken(token);
-}
-
-/** @deprecated Use removeMobileToken (async). Mantido para compatibilidade. */
-export function clearMobileToken(): void {
-  _token = null;
-  void clearToken();
-}

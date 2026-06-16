@@ -1,0 +1,113 @@
+// ─── IDENTITY SERVICE ──────────────────────────────────────────────────────────
+// Responsável por: Company (tenant), User, autenticação, tokens.
+// Sem FK para outros bancos. companyId é a chave de tenant replicada.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PlanType {
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  STOCK
+  TECHNICIAN
+  ATTENDANT
+  FINANCIAL
+}
+
+model Company {
+  id        String    @id @default(cuid())
+  name      String
+  document  String    @unique
+  plan      PlanType  @default(BASIC)
+  active    Boolean   @default(true)
+  maxUsers  Int       @default(10)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  users User[]
+}
+
+model User {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  name              String?
+  email             String
+  password          String
+  role              Role      @default(ATTENDANT)
+  active            Boolean   @default(true)
+  loginAttempts     Int       @default(0)
+  lockedUntil       DateTime?
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+  deletedBy         String?
+
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@unique([email, companyId])
+  @@index([companyId])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// AuditLog local do Identity Service — append-only
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String?
+  userId    String?
+  userEmail String?
+  entity    String?
+  entityId  String?
+  action    String
+  before    Json?
+  after     Json?
+  detail    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}

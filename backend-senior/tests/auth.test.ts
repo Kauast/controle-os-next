@@ -6,9 +6,21 @@ import { buildApp } from '../src/app';
 vi.mock('../src/lib/prisma', () => ({
   prisma: {
     user: {
+      // authenticate() usa findFirst para verificar passwordChangedAt/active
+      findFirst: vi.fn().mockResolvedValue({ passwordChangedAt: null, active: true }),
       findUnique: vi.fn(),
       create: vi.fn(),
     },
+    company: {
+      findUnique: vi.fn(),
+    },
+    refreshToken: {
+      count: vi.fn().mockResolvedValue(0),
+      create: vi.fn().mockResolvedValue({ id: 'rt-1', tokenHash: 'sha256hashvalue', userId: 'u1', expiresAt: new Date() }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
+    technician: { findFirst: vi.fn().mockResolvedValue(null) },
     $disconnect: vi.fn(),
   },
 }));
@@ -16,7 +28,11 @@ vi.mock('../src/lib/prisma', () => ({
 import { prisma } from '../src/lib/prisma';
 
 describe('POST /api/auth/register', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Restablece o comportamento padrão após clear: authenticate() precisa de user ativo
+    vi.mocked(prisma.user.findFirst).mockResolvedValue({ passwordChangedAt: null, active: true } as never);
+  });
 
   it('retorna 401 sem token', async () => {
     const app = await buildApp();
@@ -65,23 +81,30 @@ describe('POST /api/auth/register', () => {
   });
 
   it('ADMIN consegue criar usuário', async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    // findFirst: primeira chamada = auth middleware (retorna user ativo), segunda = verifica duplicidade (retorna null)
+    vi.mocked(prisma.user.findFirst)
+      .mockResolvedValueOnce({ passwordChangedAt: null, active: true } as never)
+      .mockResolvedValueOnce(null); // sem duplicata
+    vi.mocked(prisma.company.findUnique).mockResolvedValue({ id: 'company-1', active: true } as never);
     vi.mocked(prisma.user.create).mockResolvedValue({
       id: 'new-id',
+      name: null,
       email: 'novo@test.com',
       role: 'ATTENDANT' as Role,
+      companyId: 'company-1',
       password: 'hashed',
       active: true,
       createdAt: new Date(),
-    });
+    } as never);
 
     const app = await buildApp();
-    const token = app.jwt.sign({ id: 'admin-id', email: 'admin@test.com', role: 'ADMIN' });
+    const token = app.jwt.sign({ id: 'admin-id', email: 'admin@test.com', role: 'ADMIN', companyId: 'company-1' });
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
       headers: { authorization: `Bearer ${token}` },
-      payload: { email: 'novo@test.com', password: 'senha12345', role: 'ATTENDANT' },
+      // companyId obrigatório no registerSchema (o controller do registro usa body, não token)
+      payload: { email: 'novo@test.com', password: 'senha12345', role: 'ATTENDANT', companyId: 'company-1' },
     });
     expect(res.statusCode).toBe(201);
   });

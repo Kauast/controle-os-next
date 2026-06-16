@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Git Hook: Validações antes de fazer push
+# Executa antes de enviar código para origem
+# Previne pushes acidentais de branches protegidas
+
+# Cores para output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# Detectar branch atual
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# ⚠️ PROTEÇÃO: Nunca fazer push direto em main ou develop
+if [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "develop" ]]; then
+  echo -e "${RED}❌ ERRO: Não é permitido fazer push direto em '$BRANCH'${NC}"
+  echo ""
+  echo "📋 Use um Pull Request em vez disso:"
+  echo "  1. git checkout -b feature/sua-feature"
+  echo "  2. git push -u origin feature/sua-feature"
+  echo "  3. Abra PR no GitHub para $BRANCH"
+  echo ""
+  exit 1
+fi
+
+# Validar que branch tem formatação válida
+VALID_PATTERNS="^(feature|bugfix|hotfix|release)/"
+
+if ! [[ "$BRANCH" =~ $VALID_PATTERNS ]]; then
+  echo -e "${YELLOW}⚠️  AVISO: Branch '$BRANCH' não segue padrão${NC}"
+  echo ""
+  echo "Padrões válidos:"
+  echo "  feature/descricao        (novas funcionalidades)"
+  echo "  bugfix/descricao         (correções de bugs)"
+  echo "  hotfix/descricao         (bugs críticos em produção)"
+  echo "  release/v1.2.3           (preparação de release)"
+  echo ""
+  read -p "Continuar assim mesmo? [y/N] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+# Aviso: Verificar que não há commits sem push há muito tempo
+LOCAL_COMMITS=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+if [ "$LOCAL_COMMITS" -gt 10 ]; then
+  echo -e "${YELLOW}⚠️  AVISO: Você tem $LOCAL_COMMITS commits não enviados${NC}"
+  echo "Considere fazer push mais frequentemente para evitar conflicts."
+  echo ""
+fi
+
+# Sucesso
+echo -e "${GREEN}✅ Validações pré-push OK${NC}"
+exit 0

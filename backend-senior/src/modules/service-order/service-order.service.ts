@@ -226,10 +226,7 @@ export class ServiceOrderService {
 
       // Liberar reservas de estoque ao cancelar
       if (input.status === 'CANCELLED') {
-        await tx.stockReservation.updateMany({
-          where: { serviceOrderId: id, status: 'ACTIVE' },
-          data: { status: 'RELEASED', releasedAt: new Date() },
-        });
+        await stockService.releaseReservation(id, user.id, tx);
       }
 
       // Consumir reservas ao concluir
@@ -476,10 +473,7 @@ export class ServiceOrderService {
         data: { deletedAt: new Date(), deletedBy: user.id },
       });
 
-      await tx.stockReservation.updateMany({
-        where: { serviceOrderId: id, status: 'ACTIVE' },
-        data: { status: 'RELEASED', releasedAt: new Date() },
-      });
+      await stockService.releaseReservation(id, user.id, tx);
     });
 
     await audit({ companyId: user.companyId, userId: user.id, entity: 'ServiceOrder', entityId: id, action: 'OS_EXCLUIDA', before: { status: os.status, number: os.number } });

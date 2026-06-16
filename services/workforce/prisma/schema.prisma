@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Technician {
+  id              String           @id @default(cuid())
+  companyId       String
+  userId          String           @unique
+  name            String
+  email           String?
+  status          TechnicianStatus @default(AVAILABLE)
+  maxConcurrentOS Int              @default(3)
+  currentOsCount  Int              @default(0)
+  specialties     String[]
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  teamMembers     TeamMember[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model Team {
+  id        String       @id @default(cuid())
+  companyId String
+  name      String
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  members   TeamMember[]
+
+  @@index([companyId])
+}
+
+model TeamMember {
+  id           String     @id @default(cuid())
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id])
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+  role         String?
+  joinedAt     DateTime   @default(now())
+
+  @@unique([teamId, technicianId])
+}
+
+enum TechnicianStatus {
+  AVAILABLE
+  BUSY
+  OFF
+}

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
 import { audit } from '../lib/audit';
+import { AuthService } from './authService';
 
 const ROLES = ['ADMIN', 'SUPERVISOR', 'STOCK', 'TECHNICIAN', 'ATTENDANT', 'FINANCIAL'] as const;
 
@@ -74,7 +75,11 @@ export class UserService {
     const user = await prisma.user.findFirst({ where: { id, companyId } });
     if (!user) throw new AppError('Usuario nao encontrado', 404);
     const hashed = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({ where: { id }, data: { password: hashed } });
+    // Atualizar passwordChangedAt invalida JWTs emitidos antes da troca
+    await prisma.user.update({ where: { id }, data: { password: hashed, passwordChangedAt: new Date() } });
+    // Revogar todos os refresh tokens ativos do usuário
+    const authService = new AuthService();
+    await authService.revokeAllUserTokens(id);
     await audit({ userId: requesterId, userEmail: requesterEmail, action: 'SENHA_REDEFINIDA_ADMIN', detail: 'Senha de ' + user.email + ' redefinida pelo admin' });
   }
 

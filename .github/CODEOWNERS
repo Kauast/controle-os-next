@@ -1,0 +1,40 @@
+# Código Owners — Reviewers automáticos para areas específicas
+# GitHub automaticamente solicita review desses usuários em PRs que tocam estes arquivos
+
+# Default owners (todas as PRs)
+* @Kauast
+
+# Backend — Lógica de API, banco, autenticação
+backend-senior/ @Kauast
+/backend-senior/src/ @Kauast
+
+# Mobile — App Capacitor/Android
+android/ @Kauast
+capacitor.config.ts @Kauast
+
+# Frontend — React/Next.js, componentes UI
+src/ @Kauast
+/src/components/ @Kauast
+/src/pages/ @Kauast
+/src/app/ @Kauast
+
+# Infra & Deploy — Docker, nginx, scripts
+docker-compose.yml @Kauast
+Dockerfile @Kauast
+/nginx/ @Kauast
+/scripts/ @Kauast
+/.github/workflows/ @Kauast
+
+# Banco de dados
+/backend-senior/prisma/ @Kauast
+
+# Documentação
+*.md @Kauast
+/docs/ @Kauast
+
+# Config de build e linting
+package.json @Kauast
+tsconfig*.json @Kauast
+eslint.config.mjs @Kauast
+next.config*.ts @Kauast
+tailwind.config.ts @Kauast

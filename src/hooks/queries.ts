@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { fetchFinance, fetchTeamReport, fetchAttendantReport } from "@/lib/api";
+import { fetchFinance, fetchTeamReport, fetchAttendantReport } from "@/lib/api/reports";
 
 export function useTeamReport(filterTeam: string) {
   return useQuery({

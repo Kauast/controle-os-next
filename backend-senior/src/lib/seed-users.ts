@@ -6,50 +6,87 @@ import { prisma } from './prisma';
 const KNOWN_DEFAULT = 'Rb@2025#ControleOS';
 const isProd = process.env.NODE_ENV === 'production';
 
-if (
-  isProd &&
-  (!process.env.SEED_DEFAULT_PASS || process.env.SEED_DEFAULT_PASS === KNOWN_DEFAULT)
-) {
-  console.error(
-    'FATAL: SEED_DEFAULT_PASS não definido ou usa o valor padrão hardcoded. ' +
-    'Defina SEED_DEFAULT_PASS (ou senhas individuais SEED_ADMIN_PASS, etc.) no ambiente de produção.',
-  );
-  process.exit(1);
+if (isProd) {
+  const missingPasses = [
+    process.env.SEED_ADMIN_PASS,
+    process.env.SEED_STOCK_PASS,
+    process.env.SEED_TECH_PASS,
+    process.env.SEED_ATTENDANT_PASS,
+    process.env.SEED_FINANCIAL_PASS,
+  ].some((p) => !p);
+
+  if (missingPasses || process.env.SEED_DEFAULT_PASS === KNOWN_DEFAULT) {
+    console.error(
+      'FATAL: Senhas de seed ausentes ou usando valor padrão hardcoded. ' +
+      'Defina SEED_ADMIN_PASS, SEED_STOCK_PASS, SEED_TECH_PASS, SEED_ATTENDANT_PASS, SEED_FINANCIAL_PASS ' +
+      'no ambiente de produção. NUNCA use a senha padrão hardcoded.',
+    );
+    process.exit(1);
+  }
 }
 
 const DEFAULT_PASS = process.env.SEED_DEFAULT_PASS ?? KNOWN_DEFAULT;
 
-// companyId da empresa de seed. Deve existir no banco antes de rodar este script.
-// Configure SEED_COMPANY_ID no ambiente ou use o valor de dev hardcoded.
-const SEED_COMPANY_ID = process.env.SEED_COMPANY_ID ?? 'seed-company-id';
+const DEMO_COMPANY = {
+  name: 'Empresa Demo',
+  document: '00000000000100',
+  plan: 'PROFESSIONAL' as const,
+  active: true,
+};
 
 const users = [
-  { email: 'admin@controle.com',       password: process.env.SEED_ADMIN_PASS     ?? DEFAULT_PASS, role: 'ADMIN'      },
-  { email: 'estoque@controle.com',     password: process.env.SEED_STOCK_PASS     ?? DEFAULT_PASS, role: 'STOCK'      },
-  { email: 'tecnico@controle.com',     password: process.env.SEED_TECH_PASS      ?? DEFAULT_PASS, role: 'TECHNICIAN' },
-  { email: 'atendimento@controle.com', password: process.env.SEED_ATTENDANT_PASS ?? DEFAULT_PASS, role: 'ATTENDANT'  },
-  { email: 'financeiro@controle.com',  password: process.env.SEED_FINANCIAL_PASS ?? DEFAULT_PASS, role: 'FINANCIAL'  },
-] as const;
+  { email: 'admin@controle.com',       password: process.env.SEED_ADMIN_PASS     ?? DEFAULT_PASS, role: 'ADMIN'      as const },
+  { email: 'estoque@controle.com',     password: process.env.SEED_STOCK_PASS     ?? DEFAULT_PASS, role: 'STOCK'      as const },
+  { email: 'tecnico@controle.com',     password: process.env.SEED_TECH_PASS      ?? DEFAULT_PASS, role: 'TECHNICIAN' as const },
+  { email: 'atendimento@controle.com', password: process.env.SEED_ATTENDANT_PASS ?? DEFAULT_PASS, role: 'ATTENDANT'  as const },
+  { email: 'financeiro@controle.com',  password: process.env.SEED_FINANCIAL_PASS ?? DEFAULT_PASS, role: 'FINANCIAL'  as const },
+];
 
 async function main() {
+  // Criar ou encontrar Company padrão pelo documento
+  let company = await prisma.company.findFirst({ where: { document: DEMO_COMPANY.document } });
+
+  if (!company) {
+    company = await prisma.company.create({
+      data: {
+        name: DEMO_COMPANY.name,
+        document: DEMO_COMPANY.document,
+        plan: DEMO_COMPANY.plan,
+        active: DEMO_COMPANY.active,
+      },
+    });
+    console.log(`Empresa criada: ${company.name} (id: ${company.id})`);
+  } else {
+    console.log(`Empresa encontrada: ${company.name} (id: ${company.id})`);
+  }
+
   for (const u of users) {
     // Schema multi-tenant: unicidade é [email, companyId]
     const exists = await prisma.user.findFirst({
-      where: { email: u.email, companyId: SEED_COMPANY_ID },
+      where: { email: u.email, companyId: company.id },
     });
-    if (exists) { console.log(`Já existe: ${u.email}`); continue; }
+
+    if (exists) {
+      console.log(`Usuario ja existe: ${u.email}`);
+      continue;
+    }
+
     const hashed = await bcrypt.hash(u.password, 12);
     await prisma.user.create({
       data: {
         email: u.email,
         password: hashed,
         role: u.role,
-        company: { connect: { id: SEED_COMPANY_ID } },
+        company: { connect: { id: company.id } },
       },
     });
-    console.log(`Criado: ${u.email} (${u.role})`);
+    console.log(`Usuario criado: ${u.email} (${u.role})`);
   }
+
   await prisma.$disconnect();
 }
 
-main();
+main().catch((e) => {
+  console.error('Erro no seed-users:', e);
+  process.exit(1);
+});

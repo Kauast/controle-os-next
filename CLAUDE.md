@@ -176,3 +176,34 @@ Cliente → OS → Despacho → Execução → Material → Financeiro → Relat
 ```
 
 Toda feature deve se encaixar neste fluxo. Não criar telas isoladas sem contexto no fluxo.
+
+---
+
+## Superpowers — Ativação Automática de Skills
+
+Os skills abaixo estão em `.claude/skills/` e devem ser ativados **automaticamente** conforme o contexto, sem esperar o usuário pedir.
+
+### Mapeamento de contexto → skill
+
+| Situação | Skill a usar |
+|---|---|
+| Início de qualquer conversa | `using-superpowers` |
+| Implementar feature, componente, endpoint, bugfix | `test-driven-development` |
+| Encontrar bug, erro, test failure, comportamento inesperado | `systematic-debugging` |
+| Antes de dizer "está pronto", "corrigido" ou "passou" | `verification-before-completion` |
+| Antes de tocar código em feature nova ou mudança de comportamento | `brainstorming` |
+| Ter spec/requisitos com múltiplos passos antes de codar | `writing-plans` |
+| Executar um plano aprovado com múltiplas tarefas | `subagent-driven-development` ou `executing-plans` |
+| 2+ tarefas independentes sem dependência entre si | `dispatching-parallel-agents` |
+| Iniciar feature que precisa de isolamento | `using-git-worktrees` |
+| Implementação completa, todos os testes passando | `finishing-a-development-branch` |
+| Completar tarefa relevante ou antes de merge | `requesting-code-review` |
+| Receber feedback de code review | `receiving-code-review` |
+
+### Regra de ouro
+
+Antes de escrever QUALQUER código, pergunte: "Tenho um teste que falha primeiro?" → `test-driven-development`
+
+Antes de propor QUALQUER fix, pergunte: "Sei a causa raiz?" → `systematic-debugging`
+
+Antes de dizer "está feito", pergunte: "Rodei e vi o output?" → `verification-before-completion`

@@ -26,6 +26,10 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
+# Copiar entrypoint script
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 RUN mkdir -p /app/uploads && chown -R fastify:nodejs /app/uploads
 
 USER fastify
@@ -33,4 +37,4 @@ USER fastify
 EXPOSE 3333
 
 # seed deve ser executado manualmente: docker compose exec backend npm run seed
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,0 +1,45 @@
+<h2>3 abordagens para o Dispatch Board</h2>
+<p class="subtitle">Cada uma com trade-offs diferentes. Clique para selecionar.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>CSS Grid nativo + dnd-kit</h3>
+      <p><strong>Recomendada.</strong> Layout inteiramente em CSS Grid. Drag-and-drop com <code>dnd-kit</code> (já popular em projetos Next.js). Realtime via <strong>Supabase Realtime</strong> (já instalado na VPS). Push mobile via endpoint que o app Capacitor consome.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros"><h4>Prós</h4><ul><li>Zero dependências pesadas</li><li>Supabase Realtime já disponível</li><li>Performance excelente</li><li>dnd-kit tem suporte a toque (mobile)</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Grid com horários requer math de posicionamento</li><li>Modal de confirmação precisa ser feito do zero</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>FullCalendar (biblioteca pronta)</h3>
+      <p>Biblioteca de calendário completa com drag-and-drop, visão dia/semana, recursos (equipes). Realtime via polling ou Supabase. Mais rápido de implementar a parte de calendário.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros"><h4>Prós</h4><ul><li>Calendário pronto com D&D embutido</li><li>Visão dia/semana já implementada</li><li>Menos código a escrever</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>+200KB bundle</li><li>Customização visual limitada (difícil seguir o design system RB)</li><li>Fila de OSs pendentes precisa ser construída separada</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>CSS Grid + React DnD (mais baixo nível)</h3>
+      <p>Similar à A mas usando <code>react-dnd</code> ao invés de <code>dnd-kit</code>. Mais verboso, mais controle fino sobre colisões e drops customizados.</p>
+      <div class="pros-cons" style="margin-top:10px;">
+        <div class="pros"><h4>Prós</h4><ul><li>Controle total do comportamento</li><li>Bem documentado</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Mais código boilerplate que dnd-kit</li><li>Suporte a toque limitado sem addon</li><li>dnd-kit é mais moderno e mantido</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px;background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:16px;max-width:700px;margin-left:auto;margin-right:auto;">
+  <div class="label" style="color:var(--accent)">Recomendação</div>
+  <p style="margin-top:8px;font-size:14px;">A opção <strong>A (CSS Grid + dnd-kit + Supabase Realtime)</strong> é a mais alinhada com o stack atual — sem adicionar peso ao bundle, mantém o design system RB, e aproveita a infra Supabase que já está rodando na VPS.</p>
+</div>

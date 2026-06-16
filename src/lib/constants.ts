@@ -1,3 +1,10 @@
+/**
+ * Limite padrão de service orders buscados por página em listagens gerais.
+ * Usar este valor garante que todos os componentes compartilhem o mesmo cache
+ * da TanStack Query (mesma queryKey).
+ */
+export const SERVICE_ORDERS_PAGE_LIMIT = 200;
+
 export const STATUS_DOT: Record<string, string> = {
   "Em atendimento": "bg-teal",
   "A caminho": "bg-amber",

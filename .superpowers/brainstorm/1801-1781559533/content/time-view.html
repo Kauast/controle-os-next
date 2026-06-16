@@ -1,0 +1,56 @@
+<h2>Granularidade da agenda</h2>
+<p class="subtitle">Qual é a visão principal do calendário de técnicos?</p>
+
+<div class="options">
+  <div class="option" data-choice="day" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Visão do dia (padrão)</h3>
+      <p>Cada coluna é um <strong>técnico</strong>, cada linha é um <strong>horário</strong>. Hoje em foco, navega dia a dia. Ideal para despachante que opera no "agora" — vê quem está livre às 14h.</p>
+      <div style="margin-top:10px;font-size:12px;display:grid;grid-template-columns:60px repeat(3,1fr);gap:2px;background:var(--border);padding:2px;border-radius:4px;">
+        <div style="background:var(--surface-2);padding:4px;font-size:11px;color:var(--muted)"></div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">João</div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Maria</div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Carlos</div>
+        <div style="background:var(--surface-2);padding:4px;font-size:11px;color:var(--muted)">08:00</div>
+        <div style="background:#3b82f620;border-left:3px solid #3b82f6;padding:4px;font-size:11px;border-radius:2px;">OS #142</div>
+        <div style="background:var(--surface);padding:4px;"></div>
+        <div style="background:#f59e0b20;border-left:3px solid #f59e0b;padding:4px;font-size:11px;border-radius:2px;">OS #138</div>
+        <div style="background:var(--surface-2);padding:4px;font-size:11px;color:var(--muted)">10:00</div>
+        <div style="background:var(--surface);padding:4px;"></div>
+        <div style="background:#22c55e20;border-left:3px solid #22c55e;padding:4px;font-size:11px;border-radius:2px;">OS #145</div>
+        <div style="background:var(--surface);padding:4px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="week" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Visão semanal</h3>
+      <p>Cada coluna é um <strong>dia da semana</strong>, linhas são horários. Um técnico por vez. Ideal para <strong>planejar a semana</strong> — ver onde tem espaço nos próximos dias.</p>
+      <div style="margin-top:10px;font-size:12px;display:grid;grid-template-columns:50px repeat(5,1fr);gap:2px;background:var(--border);padding:2px;border-radius:4px;">
+        <div style="background:var(--surface-2);padding:4px;font-size:11px;"></div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Seg</div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Ter</div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Qua</div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Qui</div>
+        <div style="background:var(--surface-2);padding:4px;text-align:center;font-size:11px;">Sex</div>
+        <div style="background:var(--surface-2);padding:4px;font-size:11px;color:var(--muted)">08h</div>
+        <div style="background:#3b82f620;border-left:3px solid #3b82f6;padding:4px;font-size:11px;border-radius:2px;">OS #142</div>
+        <div style="background:var(--surface);padding:4px;"></div>
+        <div style="background:#22c55e20;border-left:3px solid #22c55e;padding:4px;font-size:11px;border-radius:2px;">OS #145</div>
+        <div style="background:var(--surface);padding:4px;"></div>
+        <div style="background:var(--surface);padding:4px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="both" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Alternável (dia padrão, semana disponível)</h3>
+      <p>Toggle entre as duas visões. Despachante usa dia-a-dia; supervisor usa semana para planejar. Mais trabalho de implementação, mas cobre os dois casos de uso.</p>
+    </div>
+  </div>
+</div>
