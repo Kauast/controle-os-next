@@ -6,6 +6,8 @@ export const STATUS_DOT: Record<string, string> = {
   Disponivel: "bg-teal",
 };
 
+export const SERVICE_ORDERS_PAGE_LIMIT = 100;
+
 export function statusTone(status: string): "teal" | "amber" | "red" {
   const s = status.toLowerCase();
   if (s.includes("offline")) return "red";

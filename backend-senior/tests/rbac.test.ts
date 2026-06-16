@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
 
 vi.mock('../src/lib/prisma', () => ({
   prisma: {
+    user: { findFirst: vi.fn() },
     client: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     serviceOrder: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
     product: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -10,14 +11,29 @@ vi.mock('../src/lib/prisma', () => ({
   },
 }));
 
+import { prisma } from '../src/lib/prisma';
+
 type Role = 'ADMIN' | 'STOCK' | 'TECHNICIAN' | 'ATTENDANT' | 'FINANCIAL';
 
 async function tokenFor(role: Role) {
   const app = await buildApp();
-  return app.jwt.sign({ id: `id-${role}`, email: `${role.toLowerCase()}@test.com`, role });
+  return app.jwt.sign({
+    id: `id-${role}`,
+    email: `${role.toLowerCase()}@test.com`,
+    role,
+    companyId: 'company-1',
+  });
 }
 
-describe('RBAC — Clientes', () => {
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(prisma.user.findFirst).mockResolvedValue({
+    active: true,
+    passwordChangedAt: null,
+  } as never);
+});
+
+describe('RBAC - Clientes', () => {
   it('TECHNICIAN não pode criar cliente (403)', async () => {
     const app = await buildApp();
     const token = await tokenFor('TECHNICIAN');
@@ -54,7 +70,7 @@ describe('RBAC — Clientes', () => {
   });
 });
 
-describe('RBAC — Relatórios', () => {
+describe('RBAC - Relatórios', () => {
   it('ATTENDANT não pode acessar /reports/finance (403)', async () => {
     const app = await buildApp();
     const token = await tokenFor('ATTENDANT');
@@ -78,7 +94,7 @@ describe('RBAC — Relatórios', () => {
   });
 });
 
-describe('RBAC — Produtos', () => {
+describe('RBAC - Produtos', () => {
   it('ATTENDANT não pode criar produto (403)', async () => {
     const app = await buildApp();
     const token = await tokenFor('ATTENDANT');
@@ -104,7 +120,7 @@ describe('RBAC — Produtos', () => {
   });
 });
 
-describe('RBAC — OS', () => {
+describe('RBAC - OS', () => {
   it('FINANCIAL não pode criar OS (403)', async () => {
     const app = await buildApp();
     const token = await tokenFor('FINANCIAL');
@@ -144,7 +160,6 @@ describe('Rotas públicas', () => {
       url: '/api/auth/login',
       payload: { email: 'test@test.com', password: 'qualquer' },
     });
-    // Retorna 401 por credenciais inválidas, não 403 por falta de token
     expect(res.statusCode).not.toBe(403);
   });
 });

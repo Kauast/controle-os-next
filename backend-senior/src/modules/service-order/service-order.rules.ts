@@ -78,8 +78,6 @@ export const updateExecutionSchema = z.object({
   photoUrls: z.array(z.string().url()).optional(),
   clientSignature: z.string().optional(),
   // Novo contrato: IDs de anexos privados (cuid), não URLs.
-  photoAttachmentIds: z.array(z.string().min(1)).optional(),
-  signatureAttachmentId: z.string().min(1).optional(),
 });
 
 export const assignSchema = z.object({

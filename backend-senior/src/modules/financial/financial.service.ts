@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { audit } from '../audit/audit.service';
 import { NotFoundError, AppError, ConcurrencyError, ValidationError } from '../../shared/errors';
 import { parsePagination, buildPaginatedResult } from '../../shared/pagination';
+import { lockTenantSequence } from '../../shared/sequence';
 
 interface RequestUser {
   id: string;
@@ -55,6 +56,8 @@ export class FinancialService {
       const total = subtotal - discount + tax;
 
       if (total < 0) throw new ValidationError('Total não pode ser negativo');
+
+      await lockTenantSequence(tx, user.companyId, 'invoice');
 
       const [{ nextNum }] = await tx.$queryRaw<Array<{ nextNum: number }>>`
         SELECT COALESCE(MAX(number), 0) + 1 AS "nextNum"

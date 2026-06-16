@@ -7,10 +7,14 @@ export default async function auditRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authorize('ADMIN'));
 
   app.get<{ Querystring: { page?: string; limit?: string; action?: string } }>('/', async (request, reply) => {
+    const user = request.user as { companyId: string };
     const page  = Math.max(1, Number(request.query.page  ?? 1));
     const limit = Math.min(100, Math.max(1, Number(request.query.limit ?? 50)));
     const skip  = (page - 1) * limit;
-    const where = request.query.action ? { action: request.query.action } : {};
+    const where = {
+      companyId: user.companyId,
+      ...(request.query.action ? { action: request.query.action } : {}),
+    };
     const [logs, total] = await Promise.all([
       prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit, skip }),
       prisma.auditLog.count({ where }),

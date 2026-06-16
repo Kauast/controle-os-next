@@ -6,6 +6,7 @@ import {
   NotFoundError, AppError, ConcurrencyError, ForbiddenError,
 } from '../../shared/errors';
 import { parsePagination, buildPaginatedResult } from '../../shared/pagination';
+import { lockTenantSequence } from '../../shared/sequence';
 import {
   canTransition,
   CreateServiceOrderInput,
@@ -59,7 +60,9 @@ export class ServiceOrderService {
         if (!team) throw new NotFoundError('Equipe');
       }
 
-      // Número sequencial por empresa com lock
+      await lockTenantSequence(tx, user.companyId, 'service-order');
+
+      // Número sequencial por empresa dentro da mesma transação serializada
       const [{ nextNum }] = await tx.$queryRaw<Array<{ nextNum: number }>>`
         SELECT COALESCE(MAX(number), 0) + 1 AS "nextNum"
         FROM "ServiceOrder"
@@ -165,15 +168,13 @@ export class ServiceOrderService {
         }
 
         // 2. Mínimo 3 fotos (novo contrato: attachmentIds; fallback: photoUrls legado)
-        const photoCount = (execution.photoAttachmentIds?.length ?? 0) > 0
-          ? (execution.photoAttachmentIds?.length ?? 0)
-          : (execution.photoUrls?.length ?? 0);
+        const photoCount = execution.photoUrls?.length ?? 0;
         if (photoCount < 3) {
           throw new AppError(`OS não pode ser concluída: ${photoCount}/3 fotos registradas`, 422);
         }
 
         // 3. Assinatura obrigatória
-        const hasSignature = execution.signatureAttachmentId || execution.clientSignature;
+        const hasSignature = execution.clientSignature;
         if (!hasSignature) {
           throw new AppError('OS não pode ser concluída: assinatura do cliente não coletada', 422);
         }
@@ -334,8 +335,6 @@ export class ServiceOrderService {
       if (data.workDoneNotes !== undefined) execData.workDoneNotes = data.workDoneNotes;
       if (data.photoUrls !== undefined) execData.photoUrls = data.photoUrls;
       if (data.clientSignature !== undefined) execData.clientSignature = data.clientSignature;
-      if (data.photoAttachmentIds !== undefined) execData.photoAttachmentIds = data.photoAttachmentIds;
-      if (data.signatureAttachmentId !== undefined) execData.signatureAttachmentId = data.signatureAttachmentId;
 
       await tx.serviceOrderExecution.upsert({
         where: { serviceOrderId: id },
@@ -428,7 +427,7 @@ export class ServiceOrderService {
           client: { select: { id: true, name: true, document: true, phone: true, address: true, city: true, state: true } },
           technician: { select: { id: true, name: true } },
           team: { select: { id: true, name: true } },
-          execution: { select: { checkinAt: true, checkoutAt: true, checkinLat: true, checkinLng: true, photoUrls: true, clientSignature: true, photoAttachmentIds: true, signatureAttachmentId: true } },
+          execution: { select: { checkinAt: true, checkoutAt: true, checkinLat: true, checkinLng: true, photoUrls: true, clientSignature: true } },
           _count: { select: { items: true, attachments: true } },
         },
         orderBy: [{ priority: 'desc' }, { openingDate: 'desc' }],

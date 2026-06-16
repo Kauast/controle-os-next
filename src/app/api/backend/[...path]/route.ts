@@ -19,6 +19,7 @@ const ALLOWED_PREFIXES = new Set([
   "ai",
   "attachments",
   "teams",
+  "financial",
 ]);
 
 const BLOCKED_PREFIXES = new Set(["metrics", "health", "internal", "admin"]);

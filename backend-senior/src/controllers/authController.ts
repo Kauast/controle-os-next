@@ -14,20 +14,47 @@ export class AuthController {
   async login(request: FastifyRequest, reply: FastifyReply) {
     const data = loginSchema.parse(request.body);
     const user = await service.login(data, request.ip);
-    const token = await reply.jwtSign({
+    const accessToken = await reply.jwtSign({
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
       companyId: user.companyId,
     });
-    return reply.send({ token, user });
+    const refreshToken = await service.issueRefreshToken(user.id);
+    return reply.send({ accessToken, refreshToken, user });
+  }
+
+  async refresh(request: FastifyRequest, reply: FastifyReply) {
+    const body = (request.body ?? {}) as { refreshToken?: string };
+    if (!body.refreshToken) {
+      return reply.status(400).send({ error: 'refreshToken obrigatorio' });
+    }
+
+    const { user, refreshToken } = await service.rotateRefreshToken(body.refreshToken);
+    const accessToken = await reply.jwtSign({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+    });
+
+    return reply.send({ accessToken, refreshToken, user });
+  }
+
+  async logout(request: FastifyRequest, reply: FastifyReply) {
+    const body = (request.body ?? {}) as { refreshToken?: string };
+    if (body.refreshToken) {
+      await service.revokeRefreshToken(body.refreshToken);
+    }
+    return reply.send({ ok: true });
   }
 
   async me(request: FastifyRequest, reply: FastifyReply) {
     const user = request.user as { id: string; name?: string; email: string; role: string; companyId: string };
     const technician = user.role === 'TECHNICIAN'
-      ? await prisma.technician.findUnique({ where: { userId: user.id } })
+      ? await prisma.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } })
       : null;
     return reply.send({ ...user, technician });
   }

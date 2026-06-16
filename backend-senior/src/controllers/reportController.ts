@@ -13,12 +13,12 @@ function hashTeam(s: string): number {
 
 export class ReportController {
   async teamReport(
-    request: FastifyRequest<{ Querystring: { team?: string; companyId?: string } }>,
+    request: FastifyRequest<{ Querystring: { team?: string } }>,
     reply: FastifyReply
   ) {
-    const { team, companyId } = request.query;
+    const { team } = request.query;
     const user = request.user as { id: string; companyId: string };
-    const cid = companyId ?? user.companyId;
+    const cid = user.companyId;
 
     const technicians = await prisma.technician.findMany({
       where: {

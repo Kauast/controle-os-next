@@ -81,17 +81,20 @@ export class ServiceOrderController {
     const { status, priority, teamId, technicianId, clientId, search, page, limit } =
       request.query;
     const user = request.user as RequestUser;
-    const result = await service.list({
-      companyId: user.companyId,
-      status: status as OrderStatus | undefined,
-      priority: priority as Priority | undefined,
-      teamId,
-      technicianId,
-      clientId,
-      search,
-      page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 20,
-    });
+    const result = await service.list(
+      {
+        companyId: user.companyId,
+        status: status as OrderStatus | undefined,
+        priority: priority as Priority | undefined,
+        teamId,
+        technicianId,
+        clientId,
+        search,
+        page: page ? parseInt(page) : 1,
+        limit: limit ? parseInt(limit) : 20,
+      },
+      user,
+    );
     return reply.send(result);
   }
 
@@ -109,7 +112,7 @@ export class ServiceOrderController {
     reply: FastifyReply
   ) {
     const user = request.user as RequestUser;
-    const result = await service.findById(request.params.id, user.companyId);
+    const result = await service.findById(request.params.id, user);
     return reply.send(result);
   }
 }

@@ -20,19 +20,28 @@ export default async function productRoutes(app: FastifyInstance) {
     '/:id/movements',
     async (request, reply) => {
       const { id } = request.params;
+      const user = request.user as { companyId: string };
       const page = parseInt(request.query.page ?? '1');
       const limit = Math.min(parseInt(request.query.limit ?? '20'), 100);
       const skip = (page - 1) * limit;
 
+      const product = await prisma.product.findFirst({
+        where: { id, companyId: user.companyId },
+        select: { id: true },
+      });
+      if (!product) {
+        return reply.status(404).send({ error: 'Produto nao encontrado' });
+      }
+
       const [movements, total] = await Promise.all([
         prisma.stockMovement.findMany({
-          where: { productId: id },
+          where: { productId: id, companyId: user.companyId },
           skip,
           take: limit,
           include: { serviceOrder: { include: { client: true } } },
           orderBy: { createdAt: 'desc' },
         }),
-        prisma.stockMovement.count({ where: { productId: id } }),
+        prisma.stockMovement.count({ where: { productId: id, companyId: user.companyId } }),
       ]);
 
       return reply.send({ movements, total, page, totalPages: Math.ceil(total / limit) });
