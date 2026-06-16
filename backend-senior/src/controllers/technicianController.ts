@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { TechnicianService, createTechnicianSchema, updateTechnicianSchema } from '../services/technicianService';
+import { TechnicianService, createTechnicianSchema, updateTechnicianSchema } from '../modules/technician/technician.service';
 
 const service = new TechnicianService();
 

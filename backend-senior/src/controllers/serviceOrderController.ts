@@ -1,12 +1,12 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { OrderStatus, Priority } from '@prisma/client';
+import { ServiceOrderService } from '../modules/service-order/service-order.service';
 import {
-  ServiceOrderService,
-  createOSSchema,
+  createServiceOrderSchema as createOSSchema,
   updateExecutionSchema,
   updateStatusSchema,
   assignSchema,
-} from '../services/serviceOrderService';
+} from '../modules/service-order/service-order.rules';
 
 const service = new ServiceOrderService();
 

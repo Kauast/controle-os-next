@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { ProductService, createProductSchema } from '../services/productService';
+import { ProductService, createProductSchema } from '../modules/product/product.service';
 import { StockService } from '../modules/stock/stock.service';
 
 const service = new ProductService();

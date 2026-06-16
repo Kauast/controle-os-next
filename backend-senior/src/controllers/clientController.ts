@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { ClientService, createClientSchema, updateClientSchema } from '../services/clientService';
+import { ClientService, createClientSchema, updateClientSchema } from '../modules/client/client.service';
 
 const service = new ClientService();
 

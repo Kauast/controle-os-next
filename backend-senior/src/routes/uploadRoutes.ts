@@ -6,7 +6,7 @@ import { join } from 'path';
 import { randomUUID, createHash } from 'crypto';
 import { z } from 'zod';
 import { authenticate } from '../middlewares/auth';
-import { AttachmentService } from '../services/attachmentService';
+import { AttachmentService } from '../modules/attachment/attachment.service';
 import { ForbiddenError, NotFoundError } from '../shared/errors';
 import { prisma } from '../lib/prisma';
 

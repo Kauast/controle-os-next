@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { AuthService, loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from '../services/authService';
+import { AuthService, loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from '../modules/auth/auth.service';
 import { prisma } from '../lib/prisma';
 
 const service = new AuthService();
