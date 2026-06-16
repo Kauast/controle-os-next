@@ -150,7 +150,7 @@ export default async function uploadRoutes(app: FastifyInstance) {
           select: { id: true, technicianId: true },
         });
         if (!os) {
-          return reply.status(404).send({ error: 'Ordem de serviço não encontrada' });
+          throw new NotFoundError('Ordem de serviço');
         }
         if (user.role === 'TECHNICIAN') {
           const tech = await prisma.technician.findFirst({
@@ -160,8 +160,9 @@ export default async function uploadRoutes(app: FastifyInstance) {
           if (!tech) {
             throw new ForbiddenError('Técnico não vinculado');
           }
+          // os.technicianId null (OS sem técnico atribuído) também bloqueia intencionalmente
           if (os.technicianId !== tech.id) {
-            return reply.status(404).send({ error: 'Ordem de serviço não encontrada' });
+            throw new NotFoundError('Ordem de serviço');
           }
         }
       }
