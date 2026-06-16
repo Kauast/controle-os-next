@@ -356,7 +356,7 @@ export default function TecnicoMobilePage() {
         return next;
       });
       // Upload — retorna attachmentId (sem URL publica)
-      const attachmentId = await uploadPhotoBlob(result.blob, result.filename);
+      const attachmentId = await uploadPhotoBlob(result.blob, activeOrder?.id ?? "", result.filename);
       let freshIds: string[] = [];
       setPhotos((prev) => {
         const next = [...prev] as typeof prev;
