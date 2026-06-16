@@ -60,7 +60,7 @@ export default async function materialRequestRoutes(app: FastifyInstance) {
     if (!os) return reply.status(404).send({ error: 'OS não encontrada' });
 
     const req = await prisma.materialRequest.create({
-      data: { ...data, requestedBy: data.requestedBy ?? user.id },
+      data: { ...data, companyId: user.companyId, requestedBy: data.requestedBy ?? user.id },
       include: { product: true, serviceOrder: { include: { client: true } } },
     });
     return reply.status(201).send(req);
