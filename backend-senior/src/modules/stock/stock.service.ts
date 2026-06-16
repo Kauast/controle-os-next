@@ -56,10 +56,10 @@ export class StockService {
     if (quantity <= 0) throw new AppError('Quantidade deve ser positiva');
 
     return prisma.$transaction(async (tx) => {
-      // SELECT FOR UPDATE no produto — garante serialização por produto
+      // SELECT FOR UPDATE no produto — garante serialização por produto e isola tenant
       const rows = await tx.$queryRaw<Array<{ id: string; version: number }>>`
         SELECT id, version FROM "Product"
-        WHERE id = ${productId} AND "deletedAt" IS NULL
+        WHERE id = ${productId} AND "companyId" = ${companyId} AND "deletedAt" IS NULL
         FOR UPDATE
       `;
       if (!rows.length) throw new NotFoundError('Produto');
@@ -121,7 +121,7 @@ export class StockService {
     const { companyId, productId, serviceOrderId, quantity, userId } = params;
 
     await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} AND "companyId" = ${companyId} AND "deletedAt" IS NULL FOR UPDATE`;
 
       const balance = await this.getBalance(productId, tx);
       if (balance.available < quantity) {
@@ -144,7 +144,7 @@ export class StockService {
       });
 
       for (const res of reservations) {
-        await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${res.productId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${res.productId} AND "companyId" = ${res.companyId} AND "deletedAt" IS NULL FOR UPDATE`;
         const balance = await this.getBalance(res.productId, tx);
 
         if (balance.physical < res.quantity) {
