@@ -1,0 +1,137 @@
+<h2>Design — Layout Geral</h2>
+<p class="subtitle">Dispatch Board com fila à esquerda + calendário à direita. Clique para selecionar se aprovado.</p>
+
+<div class="option" data-choice="approved" onclick="toggleSelect(this)" style="cursor:pointer;">
+  <div class="letter">✓</div>
+  <div class="content" style="width:100%">
+    <h3>Aprovar este layout</h3>
+    <p style="margin-bottom:12px;color:var(--muted)">Clique aqui se o layout abaixo está correto para avançar para o próximo detalhe.</p>
+
+    <!-- Mockup principal -->
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface-2);">
+
+      <!-- Topbar -->
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-weight:600;font-size:14px;">Despacho</span>
+          <span style="background:var(--surface-2);border:1px solid var(--border);padding:2px 10px;border-radius:20px;font-size:12px;">Segunda, 16 Jun</span>
+          <span style="background:var(--surface-2);border:1px solid var(--border);padding:2px 10px;border-radius:20px;font-size:12px;">← →</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="background:var(--accent);color:white;padding:2px 10px;border-radius:20px;font-size:11px;">Dia</span>
+          <span style="background:var(--surface-2);border:1px solid var(--border);padding:2px 10px;border-radius:20px;font-size:11px;">Semana</span>
+        </div>
+      </div>
+
+      <!-- Corpo: fila + calendário -->
+      <div style="display:flex;min-height:360px;">
+
+        <!-- Fila de OSs pendentes -->
+        <div style="width:220px;min-width:220px;border-right:1px solid var(--border);background:var(--surface);padding:10px;display:flex;flex-direction:column;gap:6px;">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Fila pendente · 4</div>
+
+          <!-- Card OS crítica -->
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-left:3px solid #ef4444;border-radius:6px;padding:8px;cursor:grab;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:600;">#147</span>
+              <span style="background:#ef444420;color:#ef4444;font-size:10px;padding:1px 6px;border-radius:10px;">Crítica</span>
+            </div>
+            <div style="font-size:12px;font-weight:500;">Alarme sem sinal</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Cliente Araújo · Zona Sul</div>
+          </div>
+
+          <!-- Card OS alta -->
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-left:3px solid #f59e0b;border-radius:6px;padding:8px;cursor:grab;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:600;">#149</span>
+              <span style="background:#f59e0b20;color:#f59e0b;font-size:10px;padding:1px 6px;border-radius:10px;">Alta</span>
+            </div>
+            <div style="font-size:12px;font-weight:500;">Câmera offline</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Supermercado BH · Centro</div>
+          </div>
+
+          <!-- Card OS normal -->
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-left:3px solid #3b82f6;border-radius:6px;padding:8px;cursor:grab;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:600;">#151</span>
+              <span style="background:#3b82f620;color:#3b82f6;font-size:10px;padding:1px 6px;border-radius:10px;">Média</span>
+            </div>
+            <div style="font-size:12px;font-weight:500;">Manutenção preventiva</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Condomínio Park · Norte</div>
+          </div>
+
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-left:3px solid #6b7280;border-radius:6px;padding:8px;cursor:grab;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:11px;font-weight:600;">#153</span>
+              <span style="background:#6b728020;color:#6b7280;font-size:10px;padding:1px 6px;border-radius:10px;">Baixa</span>
+            </div>
+            <div style="font-size:12px;font-weight:500;">Instalação cerca elétrica</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Residencial · Leste</div>
+          </div>
+        </div>
+
+        <!-- Calendário de equipes -->
+        <div style="flex:1;overflow:auto;">
+          <!-- Header equipes -->
+          <div style="display:grid;grid-template-columns:52px repeat(3,1fr);border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:1;">
+            <div style="padding:8px;border-right:1px solid var(--border);"></div>
+            <div style="padding:8px;border-right:1px solid var(--border);text-align:center;">
+              <div style="font-size:12px;font-weight:600;">Equipe Alpha</div>
+              <div style="font-size:10px;color:var(--muted);">João + Pedro</div>
+              <div style="display:inline-block;width:8px;height:8px;background:#22c55e;border-radius:50%;margin-top:2px;"></div>
+            </div>
+            <div style="padding:8px;border-right:1px solid var(--border);text-align:center;">
+              <div style="font-size:12px;font-weight:600;">Equipe Beta</div>
+              <div style="font-size:10px;color:var(--muted);">Maria + Carlos</div>
+              <div style="display:inline-block;width:8px;height:8px;background:#22c55e;border-radius:50%;margin-top:2px;"></div>
+            </div>
+            <div style="padding:8px;text-align:center;">
+              <div style="font-size:12px;font-weight:600;">Equipe Gamma</div>
+              <div style="font-size:10px;color:var(--muted);">Ana + Lucas</div>
+              <div style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:50%;margin-top:2px;"></div>
+            </div>
+          </div>
+
+          <!-- Slots de horário -->
+          <div style="display:grid;grid-template-columns:52px repeat(3,1fr);">
+            <!-- 08:00 -->
+            <div style="padding:6px 4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-align:center;">08:00</div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);">
+              <div style="background:#22c55e20;border-left:3px solid #22c55e;border-radius:4px;padding:5px 6px;font-size:11px;"><strong>#142</strong> · Instalação CFTV</div>
+            </div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-bottom:1px solid var(--border);"></div>
+
+            <!-- 09:00 -->
+            <div style="padding:6px 4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-align:center;">09:00</div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);">
+              <div style="background:#3b82f620;border-left:3px solid #3b82f6;border-radius:4px;padding:5px 6px;font-size:11px;"><strong>#138</strong> · Manutenção</div>
+            </div>
+            <div style="padding:4px;border-bottom:1px solid var(--border);"></div>
+
+            <!-- 10:00 -->
+            <div style="padding:6px 4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-align:center;">10:00</div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-bottom:1px solid var(--border);">
+              <div style="background:#f59e0b20;border-left:3px solid #f59e0b;border-radius:4px;padding:5px 6px;font-size:11px;"><strong>#145</strong> · Cerca elétrica</div>
+            </div>
+
+            <!-- 11:00 -->
+            <div style="padding:6px 4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-align:center;">11:00</div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:#3b82f608;border:2px dashed #3b82f640;"></div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-bottom:1px solid var(--border);"></div>
+
+            <!-- 14:00 -->
+            <div style="padding:6px 4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-align:center;">14:00</div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>
+            <div style="padding:4px;border-bottom:1px solid var(--border);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

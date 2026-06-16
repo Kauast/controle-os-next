@@ -13,31 +13,13 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo, formatCurrencyShort } from "@/lib/utils";
 import { useServiceOrders, useUpdateServiceOrderStatus } from "@/hooks/useServiceOrders";
 import type { ServiceOrder as ApiServiceOrder } from "@/hooks/useServiceOrders";
 import { useUIStore } from "@/store/use-ui-store";
 import { useAppStore } from "@/store/use-app-store";
 import { access } from "@/lib/access";
-
-/* ── helpers ── */
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(mins / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d`;
-  if (hours > 0) return `${hours}h`;
-  if (mins > 0) return `${mins}min`;
-  return "agora";
-}
-
-function formatCurrencyShort(value: number): string {
-  if (!value) return "—";
-  if (value >= 1000) return `R$${(value / 1000).toFixed(1)}k`;
-  return `R$${value.toFixed(0)}`;
-}
+import { SERVICE_ORDERS_PAGE_LIMIT } from "@/lib/constants";
 
 /* ── column config ── */
 
@@ -225,7 +207,7 @@ export function OsKanban() {
   const role = useAppStore((s) => s.role);
   const setNewOsOpen = useUIStore((s) => s.setNewOsOpen);
 
-  const { data: osData, isLoading } = useServiceOrders({ limit: 200 });
+  const { data: osData, isLoading } = useServiceOrders({ limit: SERVICE_ORDERS_PAGE_LIMIT });
   const updateStatus = useUpdateServiceOrderStatus();
 
   const [dragId, setDragId]   = useState<string | null>(null);

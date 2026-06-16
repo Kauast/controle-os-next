@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Chip {
+  id             String     @id @default(cuid())
+  companyId      String
+  iccid          String
+  number         String?
+  operator       String?
+  status         ChipStatus @default(AVAILABLE)
+  clientId       String?
+  clientName     String?
+  serviceOrderId String?
+  installedAt    DateTime?
+  assignedAt     DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+  history        ChipHistory[]
+
+  @@unique([companyId, iccid])
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model ChipHistory {
+  id        String   @id @default(cuid())
+  chipId    String
+  chip      Chip     @relation(fields: [chipId], references: [id])
+  action    String
+  note      String?
+  userId    String
+  userName  String
+  createdAt DateTime @default(now())
+}
+
+enum ChipStatus {
+  AVAILABLE
+  ASSIGNED
+  INSTALLED
+  INACTIVE
+}

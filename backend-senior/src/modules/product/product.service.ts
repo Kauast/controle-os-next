@@ -36,7 +36,7 @@ export class ProductService {
     if (existing) throw new ConflictError('SKU já cadastrado');
 
     if (data.categoryId) {
-      const cat = await prisma.productCategory.findFirst({ where: { id: data.categoryId, companyId: user.companyId } });
+      const cat = await prisma.productCategory.findFirst({ where: { id: data.categoryId, companyId: user.companyId, deletedAt: null } });
       if (!cat) throw new NotFoundError('Categoria');
     }
 
@@ -77,7 +77,7 @@ export class ProductService {
       if (!product) throw new NotFoundError('Produto');
 
       if (data.categoryId) {
-        const cat = await tx.productCategory.findFirst({ where: { id: data.categoryId, companyId: user.companyId } });
+        const cat = await tx.productCategory.findFirst({ where: { id: data.categoryId, companyId: user.companyId, deletedAt: null } });
         if (!cat) throw new NotFoundError('Categoria');
       }
 

@@ -3,7 +3,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 const SOFT_DELETE_MODELS = new Set([
   'Company', 'User', 'Client', 'Technician', 'Team',
-  'Product', 'ServiceOrder', 'Chip', 'Invoice',
+  'Product', 'ServiceOrder', 'Chip', 'Invoice', 'Attachment', 'ProductCategory',
 ]);
 
 function buildPrismaClient() {

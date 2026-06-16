@@ -1,0 +1,43 @@
+<h2>Comportamento do drag-and-drop</h2>
+<p class="subtitle">Quando o despachante arrasta uma OS da fila para o calendário, o que acontece?</p>
+
+<div class="options">
+  <div class="option" data-choice="slot" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Soltar no horário exato</h3>
+      <p>O despachante arrasta a OS e solta <strong>num slot de horário específico</strong> no calendário do técnico. A OS fica agendada para aquele horário. Mais preciso, requer atenção ao soltar.</p>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:12px;">
+        <div style="background:#ef444420;border:2px dashed #ef4444;padding:6px 10px;border-radius:4px;color:#ef4444;">OS #147 — Alarme</div>
+        <span style="color:var(--muted)">→ soltar em →</span>
+        <div style="background:var(--surface-2);padding:6px 10px;border-radius:4px;border:1px solid var(--border);">João · 14:00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="tech" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Soltar no técnico (sem horário fixo)</h3>
+      <p>O despachante arrasta a OS para a coluna do técnico, sem se preocupar com horário. A OS fica como <strong>"atribuída / sem horário"</strong> no topo da coluna. O técnico organiza sua própria ordem.</p>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:12px;">
+        <div style="background:#ef444420;border:2px dashed #ef4444;padding:6px 10px;border-radius:4px;color:#ef4444;">OS #147 — Alarme</div>
+        <span style="color:var(--muted)">→ soltar em →</span>
+        <div style="background:var(--surface-2);padding:6px 10px;border-radius:4px;border:1px solid var(--border);">Coluna João</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="both" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Soltar no técnico + confirmar horário</h3>
+      <p>Arrasta para o técnico → abre um <strong>mini modal de confirmação</strong> com horário sugerido (próximo slot livre). O despachante ajusta se quiser e confirma. Mais fluído e menos erro.</p>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:12px;">
+        <div style="background:#ef444420;border:2px dashed #ef4444;padding:6px 10px;border-radius:4px;color:#ef4444;">OS #147</div>
+        <span style="color:var(--muted)">→</span>
+        <div style="background:var(--accent);color:white;padding:6px 10px;border-radius:4px;">João · 14:00 ✓</div>
+      </div>
+    </div>
+  </div>
+</div>

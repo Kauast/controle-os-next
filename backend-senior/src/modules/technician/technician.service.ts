@@ -25,8 +25,10 @@ interface RequestUser {
 
 export class TechnicianService {
   async create(data: CreateTechnicianInput, user: RequestUser) {
-    const existing = await prisma.technician.findUnique({ where: { userId: data.userId } });
-    if (existing) throw new ConflictError('Usuário já vinculado a um técnico');
+    const existing = await prisma.technician.findFirst({
+      where: { userId: data.userId, companyId: user.companyId },
+    });
+    if (existing) throw new ConflictError('Usuário já vinculado a um técnico nesta empresa');
 
     const userRecord = await prisma.user.findFirst({ where: { id: data.userId, companyId: user.companyId } });
     if (!userRecord) throw new NotFoundError('Usuário');
@@ -60,7 +62,7 @@ export class TechnicianService {
 
       await audit({ companyId: user.companyId, userId: user.id, entity: 'Technician', entityId: id, action: 'TECHNICIAN_UPDATED', before, after: data });
 
-      return tx.technician.findFirst({ where: { id }, include: { user: { select: { id: true, name: true, email: true } } } });
+      return tx.technician.findFirst({ where: { id, companyId: user.companyId }, include: { user: { select: { id: true, name: true, email: true } } } });
     });
   }
 
@@ -70,14 +72,14 @@ export class TechnicianService {
       if (!technician) throw new NotFoundError('Técnico');
 
       const result = await tx.technician.updateMany({
-        where: { id, version: technician.version },
+        where: { id, companyId: user.companyId, version: technician.version },
         data: { status, version: { increment: 1 } },
       });
       if (result.count === 0) throw new ConcurrencyError();
 
       await audit({ companyId: user.companyId, userId: user.id, entity: 'Technician', entityId: id, action: 'TECHNICIAN_STATUS_CHANGED', before: { status: technician.status }, after: { status } });
 
-      return tx.technician.findFirst({ where: { id } });
+      return tx.technician.findFirst({ where: { id, companyId: user.companyId } });
     });
   }
 
@@ -117,7 +119,7 @@ export class TechnicianService {
         user: { select: { id: true, name: true, email: true, role: true } },
         teamMemberships: { include: { team: { select: { id: true, name: true } } } },
         serviceOrders: {
-          where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] } },
+          where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_PARTS'] }, deletedAt: null },
           select: { id: true, number: true, status: true, priority: true, dueDate: true },
         },
       },

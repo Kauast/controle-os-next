@@ -1,377 +1,334 @@
-# Controle OS, Estoque e Agenda
+# Controle OS - Sistema de Gestão de Ordens de Serviço
 
-Sistema de **ordens de serviço, estoque com QR Code, agenda por equipes e app do técnico** com backend real, autenticação JWT em cookie httpOnly e banco PostgreSQL.
+**Controle OS** é uma plataforma completa de gestão de Ordens de Serviço (OS) desenvolvida com tecnologias modernas, oferecendo web desktop para administradores e app mobile para técnicos de campo.
 
-## Stack
+## Visão Geral
 
-| Camada | Tecnologias |
-|--------|-------------|
-| **Frontend** | Next.js 15 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui |
-| **Estado** | TanStack Query v5, Zustand v5 |
-| **Formulários** | React Hook Form + Zod |
-| **Backend** | Fastify 5, Prisma ORM, PostgreSQL 16, Redis 7 |
-| **Auth** | JWT em cookie httpOnly/Secure/SameSite=Strict (8h), refresh token (7d) |
-| **Infra** | Docker Compose, Nginx (SSL/TLS), Certbot (Let's Encrypt) |
-| **Observabilidade** | Prometheus, Grafana, Alertmanager, Uptime Kuma, Node Exporter |
-| **Backup** | postgres-backup-local (diário, 7 dias + 4 semanas + 3 meses) |
+O sistema é composto por três aplicações principais:
 
-## Funcionalidades
+- **Frontend Web**: Interface de gerenciamento para gestores e administradores (Next.js 15)
+- **Backend API**: Server Fastify 5 com PostgreSQL e Redis para processamento e armazenamento
+- **App Mobile**: Aplicativo Android via Capacitor 8 para técnicos executarem OS em campo
 
-- 5 perfis com controle de acesso: `ADMIN`, `STOCK`, `TECHNICIAN`, `ATTENDANT`, `FINANCIAL`
-- Painel com KPIs em tempo real
-- CRUD completo de Clientes, Produtos e Técnicos
-- Agenda das equipes com drag & drop de OS
-- Estoque: QR Code, entrada/saída, alertas de estoque baixo
-- Relatórios por equipe e financeiro (somente admin)
-- App do técnico (`/tecnico`): check-in, fotos, assinatura canvas, finalização de OS
-- Rate limiting por IP com fallback Redis
+O sistema segue arquitetura **multi-tenant**, permitindo que múltiplas empresas operem de forma isolada.
 
----
+## Stack Tecnológico
 
-## Setup local (desenvolvimento)
+### Frontend (Web)
+- **Next.js 15** - Framework React com SSR
+- **TypeScript** - Tipagem de código
+- **TailwindCSS 4** - Estilização
+- **React Query** - Gerenciamento de estado assíncrono
+- **Zustand** - State management
+- **Framer Motion** - Animações
+
+### Backend
+- **Fastify 5** - Framework web rápido
+- **Prisma 6** - ORM para banco de dados
+- **PostgreSQL** - Banco de dados principal
+- **Redis** - Cache e fila de jobs
+- **BullMQ** - Processamento de jobs assíncrono
+- **JWT** - Autenticação
+- **Claude AI (Anthropic)** - Triagem automática de OS
+
+### Mobile
+- **Capacitor 8** - Framework para apps nativos
+- **React 19** - UI mobile
+- **Camera** - Captura de fotos
+- **Geolocation** - Localização GPS
+- **Network** - Detectar status online/offline
+- **Offline Queue** - Sincronização automática
+
+## Funcionalidades Principais
+
+### Para Gestores/Administradores (Web)
+- **Dashboard**: Métricas, agenda e fila de OS
+- **Ordens de Serviço**: Criar, editar, rastrear e acompanhar OS
+- **Agenda**: Agendamento de serviços
+- **Estoque**: Gerenciamento de produtos e movimentações
+- **Clientes**: Cadastro e gestão de clientes
+- **Equipes**: Organização de técnicos em equipes
+- **Usuários**: Gerenciamento de perfis e permissões
+- **Chips SIM**: Controle de chips de comunicação
+- **Rastreamento**: Localização em tempo real de técnicos
+- **Financeiro**: Faturamento e pagamentos
+- **Relatórios**: Análises de performance
+- **Auditoria**: Log de todas as ações do sistema
+
+### Para Técnicos (App Mobile)
+- **Minhas OS**: Lista de ordens atribuídas
+- **Check-in/Check-out**: Registro de geolocalização ao iniciar/finalizar
+- **Fotos**: Captura de 3 fotos (antes, durante, depois)
+- **Assinatura**: Coleta de assinatura do cliente
+- **Chip SIM**: Registro do ID do chip instalado
+- **Offline**: Funciona sem conexão, sincroniza automaticamente
+- **Status de Rede**: Indicador visual de conexão
+- **Sincronização**: Fila de ações pendentes
+
+## Como Rodar Localmente
 
 ### Pré-requisitos
+- **Node.js** 18+ e npm
+- **PostgreSQL** 14+
+- **Redis** 6+
+- Android SDK (para build APK)
 
-- Node.js 20+
-- Docker e Docker Compose
-
-### 1. Variáveis de ambiente
+### 1. Clonar e Instalar Dependências
 
 ```bash
-# Raiz (Next.js)
-cp .env.example .env.local
-# Edite .env.local e defina no mínimo:
-# BACKEND_URL=http://localhost:3333
-# JWT_SECRET=qualquer-valor-para-dev
+git clone https://github.com/Kauast/controle-os-next.git
+cd controle-os-next
+
+# Frontend
+npm install
 
 # Backend
-cp backend-senior/.env.example backend-senior/.env
-# Edite com DATABASE_URL, REDIS_URL e JWT_SECRET iguais ao .env.local
-```
-
-### 2. Subir serviços
-
-```bash
-# Terminal 1 — Banco e cache
-docker compose -f backend-senior/docker-compose.yml up -d
-
-# Terminal 2 — Backend
 cd backend-senior
 npm install
-npx prisma migrate deploy
-npm run seed     # cria usuários demo (executar apenas 1 vez)
-npm run dev
-
-# Terminal 3 — Frontend
 cd ..
-npm install
-npm run dev
 ```
 
-Acesse: [http://localhost:3000](http://localhost:3000)
-
-### Usuários demo (desenvolvimento)
-
-| E-mail | Senha padrão | Perfil |
-|--------|--------------|--------|
-| admin@controle.com | definido em `SEED_ADMIN_PASS` | Admin |
-| estoque@controle.com | `SEED_STOCK_PASS` | Estoque |
-| tecnico@controle.com | `SEED_TECH_PASS` | Técnico |
-| atendimento@controle.com | `SEED_ATTENDANT_PASS` | Atendimento |
-| financeiro@controle.com | `SEED_FINANCIAL_PASS` | Financeiro |
-
----
-
-## Deploy em produção (VPS com Docker Compose)
-
-### Pré-requisitos
-
-- VPS Ubuntu 22+ com IP público
-- DNS do domínio apontando para a VPS
-- Acesso SSH root
-
-### 1. Clonar e configurar
+### 2. Configurar Banco de Dados
 
 ```bash
-git clone https://github.com/Kauast/controle-os-next.git /opt/controle-os
-cd /opt/controle-os
+# Criar banco de dados PostgreSQL
+createdb controle_os
+
+# Criar arquivo .env no backend
+cd backend-senior
 cp .env.example .env
+# Edite .env com credenciais do PostgreSQL
+nano .env
+
+# Executar migrações
+npm run migrate:dev
+
+# (Opcional) Popular com dados iniciais
+npm run seed
+
+cd ..
 ```
 
-### 2. Variáveis obrigatórias (`.env`)
+### 3. Configurar Variáveis de Ambiente
+
+#### Frontend (.env.local)
+```bash
+cp .env.example .env.local
+# Edite conforme necessário - geralmente não precisa em desenvolvimento
+```
+
+#### Mobile (.env.mobile)
+```bash
+cp .env.mobile.example .env.mobile
+# Ajuste NEXT_PUBLIC_FASTIFY_URL com IP local do backend
+# Exemplo: http://192.168.1.100:3333
+```
+
+### 4. Iniciar Servidor Backend
 
 ```bash
-# Domínio
-DOMAIN=seu-dominio.com
-
-# PostgreSQL — use senhas fortes
-POSTGRES_USER=controle_os_user
-POSTGRES_PASSWORD=$(openssl rand -base64 32)
-POSTGRES_DB=controle_os
-
-# Redis
-REDIS_PASSWORD=$(openssl rand -base64 32)
-
-# JWT — mesmo valor no backend e frontend
-JWT_SECRET=$(openssl rand -base64 64)
-
-# Métricas (protege /metrics do backend)
-METRICS_TOKEN=$(openssl rand -base64 24)
-
-# Grafana
-GRAFANA_ADMIN_USER=admin
-GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)
-
-# Let's Encrypt
-CERTBOT_EMAIL=seu@email.com
-
-# Senhas dos usuários demo (para seed manual na primeira instalação)
-SEED_ADMIN_PASS=$(openssl rand -base64 16)
-SEED_STOCK_PASS=$(openssl rand -base64 16)
-SEED_TECH_PASS=$(openssl rand -base64 16)
-SEED_ATTENDANT_PASS=$(openssl rand -base64 16)
-SEED_FINANCIAL_PASS=$(openssl rand -base64 16)
+cd backend-senior
+npm run dev
+# Será executado em http://localhost:3333
 ```
 
-### 3. Setup automático
+### 5. Iniciar Frontend em Outro Terminal
 
 ```bash
-sudo bash scripts/setup-vps.sh
+npm run dev
+# Será executado em http://localhost:3000
 ```
 
-O script instala Docker, configura firewall, faz build, emite certificado SSL e pergunta se deseja executar o seed.
+### 6. Acessar Aplicação
 
-### 4. Seed manual (primeira instalação ou quando necessário)
+- **Web**: http://localhost:3000
+- **API**: http://localhost:3333
 
+#### Usuários de teste (após seed):
+- Email: `admin@controle.com` | Função: Administrador
+- Email: `tecnico@controle.com` | Função: Técnico
+- Email: `estoque@controle.com` | Função: Estoque
+- Email: `atendimento@controle.com` | Função: Atendimento
+- Email: `financeiro@controle.com` | Função: Financeiro
+
+As senhas são definidas em `SEED_*_PASS` no `.env` do backend.
+
+## Scripts Disponíveis
+
+### Frontend
 ```bash
-# O seed é idempotente — pula usuários que já existem
-docker compose exec backend npm run seed
-
-# Ou use o helper:
-bash scripts/seed.sh
+npm run dev           # Iniciar em desenvolvimento
+npm run build         # Build para produção
+npm run start         # Rodar build de produção
+npm run lint          # Verificar código
+npm run type-check    # Verificar tipos TypeScript
+npm run build:mobile  # Build mobile bundle
+npm run cap:sync      # Sincronizar com Capacitor
+npm run apk:debug     # Compilar APK debug
+npm run apk:release   # Compilar APK release
 ```
 
-> **Atenção:** O seed nunca é executado automaticamente em produção. O comando de produção é apenas `prisma migrate deploy && npm run start`.
-
-### 5. SSL e renovação
-
-O Certbot renova automaticamente via cronjob interno. Para emitir manualmente:
-
+### Backend
 ```bash
-bash scripts/setup-ssl.sh
+npm run dev               # Iniciar com hot reload
+npm run build             # Compilar TypeScript
+npm run start             # Rodar aplicação
+npm run migrate:dev       # Criar migração e aplicar
+npm run migrate:deploy    # Aplicar migrações em produção
+npm run studio            # Abrir Prisma Studio (GUI do banco)
+npm run seed              # Popular banco com dados iniciais
+npm run test              # Executar testes
+npm run test:coverage     # Cobertura de testes
 ```
 
-### 6. Monitoramento
-
-| Serviço | URL |
-|---------|-----|
-| App | `https://DOMAIN` |
-| Uptime Kuma | `https://DOMAIN:3001` |
-| Grafana | `https://DOMAIN:3200` |
-
-> Para segurança adicional, restrinja as portas 3001 e 3200 por IP no firewall:
-> ```bash
-> ufw allow from SEU_IP to any port 3001
-> ufw allow from SEU_IP to any port 3200
-> ufw delete allow 3001/tcp
-> ufw delete allow 3200/tcp
-> ```
-
----
-
-## App Mobile (Android APK / PWA)
-
-O app do técnico é gerado como **exportação estática do Next.js** empacotada com **Capacitor 8**.  
-A URL do backend é fixada em tempo de build via variável de ambiente — o APK **não usa a rota `/api/backend` do Next.js**.
-
-### Arquitetura
-
-| Aspecto | Web (browser) | Mobile (APK) |
-|---------|--------------|-------------|
-| Rota de API | `/api/backend` (proxy Next.js) | `NEXT_PUBLIC_FASTIFY_URL/api` (direto) |
-| Auth | Cookie `httpOnly` | Bearer token no header `Authorization` |
-| Fotos/Assinaturas | Não aplicável | Multipart form-data (sem base64 permanente) |
-| Armazenamento de token | N/A | Capacitor Preferences (criptografado) |
-| Offline | N/A | Fila local (localStorage) com sync ao reconectar |
-
-### Variáveis de ambiente mobile
-
-Crie `.env.mobile` na raiz do projeto:
-
-```bash
-# URL pública do backend — deve ser HTTPS em produção
-NEXT_PUBLIC_FASTIFY_URL=https://api.seu-dominio.com
-```
-
-### Permissões Android (`AndroidManifest.xml`)
-
-O manifesto já inclui todas as permissões necessárias:
-
-- `INTERNET` + `ACCESS_NETWORK_STATE` — comunicação com o backend
-- `CAMERA` — fotos de OS
-- `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` — check-in/checkout
-- `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE` — fotos (até API 32/29)
-- `VIBRATE` — feedback háptico
-
-### Build do APK
-
-```bash
-# 1. Exportação estática do Next.js com URL do backend fixada
-NEXT_PUBLIC_FASTIFY_URL=https://api.seu-dominio.com npm run build:mobile
-
-# 2. Sincronizar com projeto Android
-npm run cap:sync
-
-# 3. Abrir no Android Studio para gerar APK/AAB
-npm run cap:open:android
-# Ou gerar APK debug direto:
-cd android && ./gradlew assembleDebug
-```
-
-O APK gerado fica em `android/app/build/outputs/apk/debug/app-debug.apk`.
-
-### Autenticação no app
-
-O login no APK usa Bearer token:
-
-```
-POST /api/auth/login  →  { token: "eyJ..." }
-```
-
-O token é armazenado via `Capacitor.Preferences` e enviado em todas as requisições:
-
-```
-Authorization: Bearer eyJ...
-```
-
-O endpoint `/api/auth/me` retorna o perfil do usuário incluindo `technician` (se aplicável).
-
-### Upload de fotos e assinaturas
-
-As fotos são capturadas com `@capacitor/camera` (JPEG comprimido a 70%) e enviadas como **multipart/form-data** para `/api/uploads`:
-
-```
-POST /api/uploads
-Content-Type: multipart/form-data
-Authorization: Bearer <token>
-
-file: <blob JPEG>
-```
-
-Resposta: `{ url: "https://api.dominio.com/uploads/2026/06/uuid.jpg" }`
-
-O backend valida magic bytes (JPEG/PNG/WebP/PDF) e salva em `uploads/{ano}/{mes}/`.
-
-### Offline e sync
-
-Quando não há internet (detectado por `@capacitor/network`), as ações são salvas em uma fila local:
-
-1. Check-in/checkout → salvo com timestamp e coordenadas GPS
-2. Atualização de status de OS → salvo na fila
-3. Upload de foto → foto armazenada em base64 **temporariamente** na fila
-
-Ao reconectar, `offlineQueue.sync()` executa as ações na ordem em que foram criadas. Ações com erro são re-enfileiradas até 3 tentativas.
-
-### Geolocalização
-
-O check-in captura coordenadas via `@capacitor/geolocation` e abre rotas com:
-
-1. **Coordenadas GPS** — `https://maps.google.com/?daddr=lat,lng` (preferencial)
-2. **Endereço** — fallback quando GPS não está disponível
-
-### 7. Backup e restore
-
-**Backup automático** — diário às 00:00, retendo:
-- 7 dias
-- 4 semanas
-- 3 meses
-
-Backups em: `./backups/`
-
-**Backup manual imediato:**
-```bash
-bash scripts/backup-now.sh
-```
-
-**Restore:**
-```bash
-# Lista backups disponíveis
-ls -lh backups/*.sql.gz
-
-# Restaura (confirma antes de sobrescrever)
-bash scripts/restore.sh backups/ARQUIVO.sql.gz
-```
-
----
-
-## CI/CD (GitHub Actions)
-
-O workflow em `.github/workflows/ci.yml` executa em todo push/PR:
-
-1. **Backend** — typecheck + testes (Vitest)
-2. **Frontend** — typecheck + build (Next.js)
-3. **Docker** — build das imagens + validação do `docker-compose.yml`
-4. **Security** — verifica se `.env` está sendo rastreado pelo git
-
-O deploy para VPS está em `.github/workflows/deploy.yml` (precisa dos secrets abaixo).
-
-### Secrets necessários no GitHub
-
-| Secret | Descrição |
-|--------|-----------|
-| `VPS_HOST` | IP ou hostname da VPS |
-| `VPS_USER` | Usuário SSH (ex.: `deploy`) |
-| `VPS_SSH_KEY` | Chave privada SSH |
-| `VPS_SSH_PORT` | Porta SSH (padrão: 22) |
-
----
-
-## Estrutura do projeto
+## Estrutura de Pastas
 
 ```
 controle-os-next/
-├── src/                        # Frontend Next.js
-│   ├── app/
-│   │   ├── api/auth/           # BFF: login (cookie httpOnly), logout, me
-│   │   ├── api/backend/        # Proxy para Fastify
-│   │   └── login/, tecnico/, ...
-│   ├── components/             # UI por domínio
-│   ├── hooks/                  # TanStack Query hooks
-│   ├── lib/                    # tipos, utils, regras de acesso
-│   └── store/                  # Zustand stores
-├── backend-senior/             # API Fastify
+├── src/
+│   ├── app/               # Rotas Next.js (web, mobile, login, etc)
+│   ├── components/        # Componentes React reutilizáveis
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utilitários e helpers
+│   │   ├── api/           # Clientes HTTP (axios)
+│   │   ├── mobile/        # Funções Capacitor (câmera, geo, rede)
+│   │   └── access.ts      # Controle de permissões por role
+│   ├── modules/           # Módulos de negócio (service-order, etc)
+│   └── store/             # Zustand stores (auth, UI, etc)
+│
+├── backend-senior/
 │   ├── src/
-│   │   ├── controllers/        # auth, client, product, serviceOrder, ...
-│   │   ├── routes/             # registro de rotas Fastify
-│   │   ├── services/           # lógica de negócio + Prisma
-│   │   ├── lib/                # prisma, cache, metrics, health, logger
-│   │   ├── middlewares/        # authenticate, authorize
-│   │   └── plugins/            # observability
-│   └── prisma/schema.prisma    # modelos do banco
-├── nginx/                      # Config Nginx + templates SSL/HTTP
-├── monitoring/                 # Prometheus, Alertmanager, alerts.yml, Grafana
-├── scripts/                    # deploy.sh, setup-vps.sh, backup, restore, seed
-├── backups/                    # Backups PostgreSQL (não commitados)
-├── docker-compose.yml          # Stack de produção completa
-└── Dockerfile                  # Imagem frontend Next.js (standalone)
+│   │   ├── server.ts      # Entry point
+│   │   ├── app.ts         # Configuração do Fastify
+│   │   ├── routes/        # Endpoints da API
+│   │   ├── modules/       # Lógica de negócio
+│   │   ├── lib/           # Utilitários
+│   │   │   ├── prisma.ts  # Cliente Prisma
+│   │   │   ├── cache.ts   # Redis
+│   │   │   ├── config.ts  # Variáveis de ambiente
+│   │   │   └── logger.ts  # Logging
+│   │   └── middleware/    # Autenticação, CORS, rate limit
+│   ├── prisma/
+│   │   ├── schema.prisma  # Definição do banco de dados
+│   │   └── migrations/    # Histórico de mudanças no banco
+│   └── .env.example       # Exemplo de variáveis
+│
+└── docs/                  # Documentação
+    ├── GUIA_GESTOR.md     # Como usar a interface web
+    ├── GUIA_TECNICO.md    # Como usar o app mobile
+    └── INSTALACAO.md      # Deploy e instalação
 ```
+
+## Variáveis de Ambiente Importantes
+
+### Frontend (.env.local)
+```
+NEXT_PUBLIC_FASTIFY_URL=http://localhost:3333
+JWT_SECRET=sua-chave-secreta
+```
+
+### Backend (.env)
+```
+DATABASE_URL=postgresql://user:pass@localhost:5432/controle_os
+REDIS_URL=redis://:password@localhost:6379
+JWT_SECRET=sua-chave-secreta
+PORT=3333
+```
+
+### Mobile (.env.mobile)
+```
+NEXT_PUBLIC_FASTIFY_URL=http://192.168.1.100:3333  # IP local
+```
+
+Para detalhes completos, veja `docs/INSTALACAO.md`.
+
+## Modelos de Dados Principais
+
+### ServiceOrder (Ordem de Serviço)
+- ID, número sequencial, cliente, técnico
+- Status: OPEN, IN_PROGRESS, WAITING_PARTS, COMPLETED, CANCELLED
+- Prioridade: NORMAL, WARNING, HIGH, CRITICAL
+- Datas: abertura, vencimento, início, conclusão
+- Descrição e notas internas
+- Itens (produtos/serviços) e valor total
+
+### ServiceOrderExecution (Execução da OS)
+- Check-in/Check-out com geolocalização
+- Fotos (até 3)
+- Assinatura do cliente
+- Notas de trabalho realizado
+- Chip SIM instalado
+
+### Technician (Técnico)
+- Associado a um usuário
+- Status: AVAILABLE, BUSY, OFF, VACATION
+- Especialidade
+- Máximo de OS simultâneas
+- Equipes que participa
+
+### Client (Cliente)
+- Dados completos (nome, documento, telefone, email, endereço)
+- Pode estar bloqueado com motivo
+- Histórico de OS
+
+### Product (Produto)
+- SKU único
+- Preço de custo e venda
+- Estoque e movimentações
+- Categoria
+
+### Invoice & Payment (Financeiro)
+- Faturamento de OS
+- Registro de pagamentos
+- Múltiplas parcelas
+- Descontos, juros, multa
+
+## Segurança
+
+- **Autenticação**: JWT com refresh tokens
+- **Autorização**: RBAC (Role-Based Access Control)
+- **Encriptação**: Senhas com bcryptjs
+- **Rate Limiting**: Proteção contra brute force
+- **CORS**: Configurado por domínio
+- **SQL Injection**: Prisma previne via prepared statements
+- **XSS**: Next.js com sanitização automática
+- **Audit Log**: Todas as ações registradas
+
+## Implantação em Produção
+
+Veja o guia completo em `docs/INSTALACAO.md` para:
+- Configuração de VPS
+- Instalação com Docker Compose
+- SSL/HTTPS automático (Certbot)
+- Backup e disaster recovery
+- Monitoramento e logs
+- Performance tuning
+
+## Documentação Adicional
+
+- **[docs/GUIA_GESTOR.md](docs/GUIA_GESTOR.md)** - Manual completo para administradores e gestores
+- **[docs/GUIA_TECNICO.md](docs/GUIA_TECNICO.md)** - Tutorial para técnicos no app mobile
+- **[docs/INSTALACAO.md](docs/INSTALACAO.md)** - Guia de deployment e configuração técnica
+
+## Contribuindo
+
+Este é um projeto privado. Para contribuições, entre em contato com o time de desenvolvimento.
+
+## Suporte
+
+Em caso de dúvidas ou problemas:
+1. Consulte a documentação em `docs/`
+2. Verifique os logs (backend: stdout, frontend: console do navegador)
+3. Abra uma issue no repositório
+
+## Licença
+
+ISC - Veja LICENSE
+
+## Autor
+
+**Kauã Miranda** - Desenvolvedor Full Stack
 
 ---
 
-## Checklist de produção
-
-- [ ] `.env` criado com senhas fortes (nunca commitar)
-- [ ] `DOMAIN` apontando para a VPS no DNS
-- [ ] `CERTBOT_EMAIL` válido para alertas de renovação SSL
-- [ ] `JWT_SECRET` com pelo menos 64 chars aleatórios
-- [ ] `METRICS_TOKEN` definido (protege `/metrics`)
-- [ ] `GRAFANA_ADMIN_PASSWORD` forte definido
-- [ ] Seed executado manualmente na primeira instalação
-- [ ] Firewall UFW ativo (portas 22, 80, 443, 3001, 3200)
-- [ ] Portas 3001 e 3200 restritas por IP se uso interno apenas
-- [ ] Backup testado: `bash scripts/backup-now.sh` + restore verificado
-- [ ] Grafana configurado com datasource Prometheus
-- [ ] Uptime Kuma com monitor do health endpoint
-- [ ] Alertmanager com webhook ou email configurado em `monitoring/alertmanager.yml`
-- [ ] Logs com rotação configurados (já no docker-compose.yml)
-- [ ] `docker compose ps` — todos os containers `Up (healthy)`
+Última atualização: June 2026

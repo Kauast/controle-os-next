@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "type-check": "tsc --noEmit",
     "lint": "eslint",
     "build:mobile": "node scripts/build-mobile.js",
     "cap:init": "npx cap add android",

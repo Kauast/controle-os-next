@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL, COOKIE_BASE } from "@/lib/api/backend-config";
 
-const BACKEND = process.env.BACKEND_URL ?? "http://localhost:3333";
-const IS_PROD = process.env.NODE_ENV === "production";
+const BACKEND = BACKEND_URL;
 
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get("refresh_token")?.value;
@@ -21,13 +21,7 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ ok: true });
 
-  const clearCookie = {
-    httpOnly: true,
-    secure: IS_PROD,
-    sameSite: "strict" as const,
-    maxAge: 0,
-    path: "/",
-  };
+  const clearCookie = { ...COOKIE_BASE, maxAge: 0 };
 
   response.cookies.set("auth_token", "", clearCookie);
   response.cookies.set("refresh_token", "", clearCookie);

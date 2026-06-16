@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/api/backend-config";
 
-const BACKEND = process.env.BACKEND_URL ?? "http://localhost:3333";
+const BACKEND = BACKEND_URL;
 
 export async function POST(request: NextRequest) {
   const body = await request.json();

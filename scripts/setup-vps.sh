@@ -20,6 +20,8 @@ source .env
 [[ -z "${JWT_SECRET:-}"        ]] && error "JWT_SECRET não definido no .env"
 [[ -z "${POSTGRES_PASSWORD:-}" ]] && error "POSTGRES_PASSWORD não definido no .env"
 [[ -z "${CERTBOT_EMAIL:-}"     ]] && error "CERTBOT_EMAIL não definido no .env"
+[[ -z "${ANTHROPIC_API_KEY:-}" ]] && error "ANTHROPIC_API_KEY não definido no .env"
+[[ -z "${METRICS_TOKEN:-}"     ]] && error "METRICS_TOKEN não definido no .env"
 
 step "1/7 — Instalando Docker"
 if ! command -v docker &>/dev/null; then
@@ -58,13 +60,13 @@ info "Diretórios criados"
 
 step "4/7 — Build e start dos serviços (modo HTTP)"
 docker compose build --quiet
-docker compose up -d postgres redis
-info "Aguardando banco de dados..."
-sleep 20
+docker compose up -d postgres redis pgbouncer
+info "Aguardando banco de dados e connection pool..."
+sleep 30
 
 docker compose up -d backend
-info "Aguardando backend (pode levar ~60s na primeira vez)..."
-sleep 60
+info "Aguardando backend (entrypoint script executa migrations automaticamente, pode levar ~90s)..."
+sleep 90
 
 docker compose up -d frontend nginx certbot
 info "Frontend e Nginx iniciados"

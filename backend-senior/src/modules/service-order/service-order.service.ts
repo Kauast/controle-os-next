@@ -144,7 +144,7 @@ export class ServiceOrderService {
       if (!os) throw new NotFoundError('OS');
 
       if (user.role === 'TECHNICIAN') {
-        const tech = await tx.technician.findFirst({ where: { userId: user.id } });
+        const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
       }
 
@@ -226,15 +226,12 @@ export class ServiceOrderService {
 
       // Liberar reservas de estoque ao cancelar
       if (input.status === 'CANCELLED') {
-        await tx.stockReservation.updateMany({
-          where: { serviceOrderId: id, status: 'ACTIVE' },
-          data: { status: 'RELEASED', releasedAt: new Date() },
-        });
+        await stockService.releaseReservation(id, user.id, tx);
       }
 
       // Consumir reservas ao concluir
       if (input.status === 'COMPLETED') {
-        await stockService.consumeReservation(id, user.id);
+        await stockService.consumeReservation(id, user.id, tx);
       }
 
       await audit({
@@ -248,7 +245,7 @@ export class ServiceOrderService {
       });
 
       return tx.serviceOrder.findFirst({
-        where: { id },
+        where: { id, companyId: user.companyId },
         include: { client: true, technician: true, team: true, items: true },
       });
     });
@@ -301,7 +298,7 @@ export class ServiceOrderService {
       await audit({ companyId: user.companyId, userId: user.id, entity: 'ServiceOrder', entityId: id, action: 'OS_ATRIBUIDA', before, after: input });
 
       return tx.serviceOrder.findFirst({
-        where: { id },
+        where: { id, companyId: user.companyId },
         include: { client: true, technician: true, team: true },
       });
     });
@@ -318,7 +315,7 @@ export class ServiceOrderService {
       }
 
       if (user.role === 'TECHNICIAN') {
-        const tech = await tx.technician.findFirst({ where: { userId: user.id } });
+        const tech = await tx.technician.findFirst({ where: { userId: user.id, companyId: user.companyId } });
         if (!tech || os.technicianId !== tech.id) throw new ForbiddenError('Técnico não autorizado para esta OS');
       }
 
@@ -364,7 +361,7 @@ export class ServiceOrderService {
       });
 
       return tx.serviceOrder.findFirst({
-        where: { id },
+        where: { id, companyId: user.companyId },
         include: { execution: true, client: true, technician: true },
       });
     });
@@ -470,9 +467,13 @@ export class ServiceOrderService {
     if (os.status === 'COMPLETED') throw new AppError('Não é possível excluir uma OS concluída', 422);
     if (os.status === 'IN_PROGRESS') throw new AppError('Cancele a OS antes de excluir', 422);
 
-    await prisma.serviceOrder.update({
-      where: { id },
-      data: { deletedAt: new Date(), deletedBy: user.id },
+    await prisma.$transaction(async (tx) => {
+      await tx.serviceOrder.update({
+        where: { id },
+        data: { deletedAt: new Date(), deletedBy: user.id },
+      });
+
+      await stockService.releaseReservation(id, user.id, tx);
     });
 
     await audit({ companyId: user.companyId, userId: user.id, entity: 'ServiceOrder', entityId: id, action: 'OS_EXCLUIDA', before: { status: os.status, number: os.number } });
@@ -494,6 +495,7 @@ export class ServiceOrderService {
     if (!technician.isActive) throw new AppError('Técnico inativo', 422);
 
     const where: Prisma.ServiceOrderWhereInput = {
+      companyId,
       technicianId,
       status: 'IN_PROGRESS',
     };

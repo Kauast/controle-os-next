@@ -3,8 +3,20 @@ import { buildApp } from '../src/app';
 
 vi.mock('../src/lib/prisma', () => ({
   prisma: {
+    // authenticate() usa findFirst para verificar passwordChangedAt/active
+    user: {
+      findFirst: vi.fn().mockResolvedValue({ passwordChangedAt: null, active: true }),
+      findUnique: vi.fn(),
+    },
     client: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    serviceOrder: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    serviceOrder: {
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    technician: { findFirst: vi.fn().mockResolvedValue(null) },
     product: { findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
     $disconnect: vi.fn(),
   },

@@ -9,6 +9,7 @@ import { authenticate } from '../middlewares/auth';
 import { AttachmentService } from '../services/attachmentService';
 import { ForbiddenError, NotFoundError } from '../shared/errors';
 import { prisma } from '../lib/prisma';
+import { audit } from '../modules/audit/audit.service';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -220,6 +221,16 @@ export default async function uploadRoutes(app: FastifyInstance) {
           throw new NotFoundError('Anexo');
         }
       }
+
+      // Auditoria de download
+      await audit({
+        companyId: user.companyId,
+        userId: user.id,
+        entity: 'Attachment',
+        entityId: id,
+        action: 'ATTACHMENT_DOWNLOADED',
+        after: { fileName: attachment.fileName, mimeType: attachment.mimeType },
+      });
 
       const useS3 = attachment.storageProvider === 's3';
 

@@ -1,0 +1,60 @@
+version: "3.9"
+
+# =============================================================================
+# Override de desenvolvimento — hot-reload via tsx watch
+#
+# Aplicado automaticamente quando usado junto com o compose principal:
+#   docker compose -f docker-compose.microservices.yml \
+#                  -f docker-compose.microservices.override.yml up -d
+#
+# Cada servico monta o diretorio src/ local e executa "npm run dev".
+# Requisito: o package.json de cada servico deve ter:
+#   "dev": "tsx watch src/server.ts"
+# =============================================================================
+
+services:
+
+  identity-svc:
+    volumes:
+      - ./services/identity/src:/app/src
+    command: npm run dev
+
+  customer-svc:
+    volumes:
+      - ./services/customer/src:/app/src
+    command: npm run dev
+
+  chip-svc:
+    volumes:
+      - ./services/chip/src:/app/src
+    command: npm run dev
+
+  inventory-svc:
+    volumes:
+      - ./services/inventory/src:/app/src
+    command: npm run dev
+
+  workforce-svc:
+    volumes:
+      - ./services/workforce/src:/app/src
+    command: npm run dev
+
+  service-order-svc:
+    volumes:
+      - ./services/service-order/src:/app/src
+    command: npm run dev
+
+  billing-svc:
+    volumes:
+      - ./services/billing/src:/app/src
+    command: npm run dev
+
+  media-svc:
+    volumes:
+      - ./services/media/src:/app/src
+    command: npm run dev
+
+  notification-svc:
+    volumes:
+      - ./services/notification/src:/app/src
+    command: npm run dev

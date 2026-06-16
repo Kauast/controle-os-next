@@ -1,0 +1,157 @@
+# Git Aliases — Atalhos Úteis
+#
+# Como usar:
+#
+#   Opção 1 — Carregar este arquivo no seu .gitconfig global:
+#     git config --global include.path '<path-to-this-file>'
+#
+#   Opção 2 — Copiar e colar no seu .gitconfig (~/.gitconfig):
+#     cat .gitconfig-aliases >> ~/.gitconfig
+#
+#   Opção 3 — Executar manualmente:
+#     git config --global alias.st status
+#     git config --global alias.co checkout
+#     ... etc ...
+
+[alias]
+  # STATUS & LOG
+  st = status                                     # git st
+  lg = log --oneline --graph --all --decorate    # git lg
+  lgs = log --oneline --graph --decorate         # git lgs (current branch only)
+  ll = log --oneline -20                         # git ll (últimos 20)
+  hist = log --pretty=format:'%h %ad | %s%d [%an]' --graph --date=short  # git hist
+
+  # CHECKOUT & BRANCHES
+  co = checkout                                  # git co develop
+  cob = checkout -b                              # git cob feature/new
+  br = branch                                    # git br
+  bra = branch -a                                # git bra
+  brv = branch -vv                               # git brv (com upstream)
+
+  # ADD & COMMIT
+  a = add                                        # git a .
+  aa = add -A                                    # git aa (all changes)
+  cm = commit -m                                 # git cm "mensagem"
+  cma = commit -am                               # git cma "mensagem"
+  amend = commit --amend --no-edit              # git amend
+
+  # PUSH & PULL
+  p = push origin                                # git p (push current branch)
+  pu = push -u origin                            # git pu (push with upstream)
+  pl = pull origin                               # git pl develop
+  plr = pull --rebase origin                     # git plr develop (pull com rebase)
+  pf = push --force-with-lease                   # git pf (force com segurança)
+
+  # RESET & REVERT
+  reset1 = reset --soft HEAD~1                   # git reset1 (undo last commit, keep changes)
+  reset-hard = reset --hard HEAD~1               # git reset-hard (undo last commit, discard)
+  revert-last = revert HEAD                      # git revert-last (cria commit de undo)
+
+  # DIFF
+  d = diff                                       # git d
+  dc = diff --cached                             # git dc (staged changes)
+  dw = diff --word-diff                          # git dw (word-level diff)
+
+  # REBASE & MERGE
+  rb = rebase                                    # git rb origin/develop
+  rbi = rebase -i                                # git rbi HEAD~3 (interactive)
+  rbc = rebase --continue                        # git rbc (after resolving conflicts)
+  rba = rebase --abort                           # git rba (cancel rebase)
+
+  # STASH
+  stash-named = stash save                       # git stash-named "work in progress"
+  stash-list = stash list                        # git stash-list
+  stash-pop = stash pop                          # git stash-pop
+  stash-drop = stash drop                        # git stash-drop stash@{0}
+
+  # USEFUL COMBINATIONS
+  sync = !git fetch origin && git rebase origin/develop   # git sync (sincronizar com develop)
+  update = !git pull --rebase origin && git push origin    # git update (pull rebase + push)
+  clean-local = !git branch --merged develop | grep -v develop | xargs -r git branch -d  # git clean-local
+
+  # SEARCH & FIND
+  find = "!git log -S"                           # git find "texto para procurar"
+  grep-history = "!git log -p -S"                # git grep-history "função_deletada"
+  blame-range = blame -L                         # git blame-range 10,20 file.ts
+
+  # REVIEW & CODE QUALITY
+  changes = diff --name-only HEAD~1              # git changes (arquivos do último commit)
+  changes-staged = diff --cached --name-only     # git changes-staged
+  lines-changed = diff --stat HEAD~1             # git lines-changed (linhas por arquivo)
+
+  # CLEANUP & MAINTENANCE
+  gc-aggressive = gc --aggressive                # git gc-aggressive (cleanup repo)
+  prune = remote prune origin                    # git prune (remove deleted remote branches locally)
+  clean-branches = !git branch --merged | grep -v '^*' | xargs -r git branch -d  # git clean-branches
+
+  # BISECT (para encontrar commit que quebrou)
+  bisect-start = bisect start                    # git bisect-start
+  bisect-bad = bisect bad                        # git bisect-bad
+  bisect-good = bisect good                      # git bisect-good
+  bisect-reset = bisect reset                    # git bisect-reset
+
+  # SHORTCUTS PARA COMMON BRANCHES
+  main = checkout main
+  develop = checkout develop
+  go-feature = !git checkout develop && git pull origin develop && git checkout -b  # git go-feature nome
+
+  # STATS & INFO
+  contributors = shortlog -sn --all             # git contributors (por commits)
+  stats = log --stat --all                      # git stats
+  impact = log --shortstat --reverse             # git impact
+
+  # RESCUE COMMANDS
+  recover = reflog                               # git recover (see lost commits)
+  lost-and-found = fsck --lost-found             # git lost-and-found (encontrar commits órfãos)
+
+  # FANCY
+  graph = log --all --oneline --decorate --graph  # git graph (bonito)
+  tree = log --graph --oneline --all --decorate  # git tree (tree-like)
+
+  # DEVELOPER VELOCITY
+  wip = !git add -A && git commit -m "wip: work in progress"  # git wip
+  unwip = reset --soft HEAD~1                                  # git unwip
+
+  # RELEASE & VERSIONING
+  current-tag = describe --tags --abbrev=0      # git current-tag (tag mais recente)
+  release-branch = checkout -b release/          # git release-branch v1.2.3
+
+  # CHERRYPICK HELPERS
+  last-commit = rev-parse HEAD                  # git last-commit (hash do último)
+  last-message = log -1 --pretty=%B             # git last-message (mensagem do último)
+
+# EXEMPLOS DE USO
+#
+# git st                  # Ver status rápido
+# git lg                  # Ver histórico com gráfico bonito
+# git co develop          # Checkout em develop
+# git cob feature/novo    # Criar feature branch
+# git cm "msg"            # Fazer commit com mensagem
+# git p                   # Fazer push da branch atual
+# git pl develop          # Pull develop
+# git sync                # Sincronizar com develop (fetch + rebase)
+# git clean-local         # Deletar branches locais que foram mergeadas
+# git contributors        # Ver commits por autor
+# git wip                 # Quick save (work in progress)
+# git unwip               # Desfazer wip
+
+[core]
+  # Configurações adicionais recomendadas
+  autoCRLF = true         # Auto-convert line endings (Windows)
+  ignorecase = false      # Respeitar case em nomes de arquivo
+
+[pull]
+  # Preferir rebase ao fazer pull (mais limpo)
+  rebase = true
+
+[merge]
+  # Sempre criar merge commit (não fast-forward)
+  ff = false
+
+[status]
+  # Mostrar branch upstream no status
+  showUpstreamBranch = true
+
+[rebase]
+  # Auto-resolve trivial conflicts em rebase
+  autoStash = true

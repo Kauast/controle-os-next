@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Attachment {
+  id           String    @id @default(cuid())
+  companyId    String
+  entityType   String    // "service_order" | "execution" | "client" | etc.
+  entityId     String    // ID da entidade dona do anexo
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String    // path no bucket S3/MinIO ou path local
+  url          String?   // URL pública ou assinada
+  hash         String?   // SHA-256 do arquivo
+  uploadedBy   String    // userId ref. Identity Svc
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  @@index([companyId, entityType, entityId])
+}
