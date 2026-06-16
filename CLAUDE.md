@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guia obrigatório para agentes de IA trabalhando neste repositório.
+Guia obrigatório para agentes de IA ou skills trabalhando neste repositório.
 
 ## Projeto
 
