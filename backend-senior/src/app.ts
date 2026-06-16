@@ -18,12 +18,14 @@ import userRoutes from './routes/userRoutes';
 import auditRoutes from './routes/auditRoutes';
 import aiRoutes from './routes/aiRoutes';
 import teamRoutes from './routes/teamRoutes';
+import syncRoutes from './routes/syncRoutes';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
 import { config } from './lib/config';
 import { metricsText, metricsContentType } from './lib/metrics';
 import { healthReport, livenessReport } from './lib/health';
 import { registerObservability, logRequestError } from './plugins/observability';
+import { registerIdempotency } from './plugins/idempotency';
 import { redis } from './lib/cache';
 
 // Decodifica payload JWT sem verificar assinatura — apenas para identificar o tenant no rate limit.
@@ -79,11 +81,12 @@ export async function buildApp(): Promise<FastifyInstance> {
       return reply.status(400).send({ error: 'Dados invalidos', details: error.issues, reqId: request.id });
     }
     if (error instanceof AppError) {
-      return reply.status(error.statusCode).send({ error: error.message, reqId: request.id });
+      return reply.status(error.statusCode).send({ error: error.message, code: error.code, reqId: request.id });
     }
     const statusCode = error.statusCode ?? 500;
     reply.status(statusCode).send({
       error: statusCode === 500 ? 'Erro interno do servidor' : error.message,
+      code: (error as { code?: string }).code,
       reqId: request.id,
     });
   });
@@ -164,6 +167,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     return reply.send(await metricsText());
   });
 
+  // Idempotência de mutações via header Idempotency-Key (após jwt, antes das rotas).
+  registerIdempotency(app);
+
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(serviceOrderRoutes, { prefix: '/api/service-orders' });
   await app.register(clientRoutes, { prefix: '/api/clients' });
@@ -177,6 +183,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(auditRoutes, { prefix: '/api/audit' });
   await app.register(aiRoutes, { prefix: '/api/ai' });
   await app.register(teamRoutes, { prefix: '/api/teams' });
+  await app.register(syncRoutes, { prefix: '/api/sync' });
 
   return app;
 }

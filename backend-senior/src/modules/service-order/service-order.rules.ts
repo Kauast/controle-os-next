@@ -59,6 +59,7 @@ export const updateStatusSchema = z.object({
   status: z.nativeEnum(OrderStatus),
   cancellationReason: z.string().min(3).optional(),
   note: z.string().optional(),
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 export const updateExecutionSchema = z.object({
@@ -80,11 +81,13 @@ export const updateExecutionSchema = z.object({
   // Novo contrato: IDs de anexos privados (cuid), não URLs.
   photoAttachmentIds: z.array(z.string().min(1)).optional(),
   signatureAttachmentId: z.string().min(1).optional(),
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 export const assignSchema = z.object({
   technicianId: z.string().min(1).nullable().optional(),
   teamId: z.string().min(1).nullable().optional(),
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 export type CreateServiceOrderInput = z.infer<typeof createServiceOrderSchema>;

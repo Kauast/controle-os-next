@@ -1,117 +1,101 @@
-export type QueueActionType =
-  | "CHECKIN"
-  | "UPDATE_EXECUTION"
-  | "UPDATE_STATUS"
-  | "COMPLETE_OS";
+import { putAction, allActions, deleteAction, type QueueAction } from "./offline-db";
 
-export interface QueueAction {
-  id: string;
+export type QueueActionType = QueueAction["type"];
+export type { QueueAction };
+
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 1000;
+
+function backoff(retry: number): number {
+  const exp = BASE_DELAY_MS * 2 ** retry;
+  const jitter = Math.random() * 0.3 * exp;
+  return Math.min(exp + jitter, 60_000);
+}
+
+export async function enqueue(action: {
   serviceOrderId: string;
   type: QueueActionType;
   payload: Record<string, unknown>;
-  status: "pending" | "syncing" | "done" | "error";
-  retryCount: number;
-  createdAt: string;
-  error?: string;
-}
-
-const QUEUE_KEY = "offline_queue_v1";
-const MAX_RETRIES = 3;
-
-function loadQueue(): QueueAction[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveQueue(queue: QueueAction[]): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-  }
-}
-
-export function enqueue(
-  action: Omit<QueueAction, "id" | "status" | "retryCount" | "createdAt">
-): void {
-  const queue = loadQueue();
-  queue.push({
+  expectedVersion?: number;
+}): Promise<void> {
+  await putAction({
     ...action,
     id: crypto.randomUUID(),
     status: "pending",
     retryCount: 0,
+    nextAttemptAt: Date.now(),
     createdAt: new Date().toISOString(),
   });
-  saveQueue(queue);
 }
 
-export function getQueue(): QueueAction[] {
-  return loadQueue();
+export async function getQueue(): Promise<QueueAction[]> {
+  return allActions();
 }
 
-export function getPendingCount(): number {
-  return loadQueue().filter(
-    (a) => a.status === "pending" || a.status === "syncing"
-  ).length;
+export async function getPendingCount(): Promise<number> {
+  return (await allActions()).filter((a) => a.status === "pending" || a.status === "syncing").length;
 }
 
-export function clearDoneItems(): void {
-  saveQueue(loadQueue().filter((a) => a.status !== "done"));
+export async function clearDoneItems(): Promise<void> {
+  const done = (await allActions()).filter((a) => a.status === "done");
+  await Promise.all(done.map((a) => deleteAction(a.id)));
 }
 
-async function executeAction(
-  action: QueueAction,
-  client: { patch: (url: string, data: unknown) => Promise<unknown> }
-): Promise<void> {
-  const { serviceOrderId, type, payload } = action;
-  switch (type) {
-    case "CHECKIN":
-    case "UPDATE_EXECUTION":
-      await client.patch(`/service-orders/${serviceOrderId}/execution`, payload);
-      break;
-    case "UPDATE_STATUS":
-    case "COMPLETE_OS":
-      await client.patch(`/service-orders/${serviceOrderId}/status`, payload);
-      break;
-  }
+interface HttpClient {
+  patch: (url: string, data: unknown, opts?: { headers?: Record<string, string> }) => Promise<unknown>;
+}
+
+async function executeAction(action: QueueAction, client: HttpClient): Promise<void> {
+  const { serviceOrderId, type, payload, expectedVersion, id } = action;
+  const body = expectedVersion !== undefined ? { ...payload, expectedVersion } : payload;
+  const headers = { "Idempotency-Key": id };
+  const url =
+    type === "UPDATE_STATUS" || type === "COMPLETE_OS"
+      ? `/service-orders/${serviceOrderId}/status`
+      : `/service-orders/${serviceOrderId}/execution`;
+  await client.patch(url, body, { headers });
 }
 
 export async function syncQueue(
-  client: { patch: (url: string, data: unknown) => Promise<unknown> },
-  onProgress?: (done: number, total: number) => void
-): Promise<{ synced: number; failed: number }> {
-  const queue = loadQueue();
+  client: HttpClient,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ synced: number; failed: number; conflicts: number }> {
+  const now = Date.now();
+  const queue = await allActions();
   const pending = queue.filter(
-    (a) => a.status === "pending" || (a.status === "error" && a.retryCount < MAX_RETRIES)
+    (a) =>
+      (a.status === "pending" || (a.status === "error" && a.retryCount < MAX_RETRIES)) &&
+      a.nextAttemptAt <= now,
   );
 
-  let synced = 0;
-  let failed = 0;
+  let synced = 0,
+    failed = 0,
+    conflicts = 0;
 
   for (const action of pending) {
-    const idx = queue.findIndex((a) => a.id === action.id);
-    if (idx === -1) continue;
-    queue[idx].status = "syncing";
-    saveQueue(queue);
-
+    action.status = "syncing";
+    await putAction(action);
     try {
       await executeAction(action, client);
-      queue[idx].status = "done";
+      action.status = "done";
       synced++;
     } catch (err) {
-      queue[idx].retryCount++;
-      queue[idx].status =
-        queue[idx].retryCount >= MAX_RETRIES ? "error" : "pending";
-      queue[idx].error =
-        err instanceof Error ? err.message : "Erro desconhecido";
-      failed++;
+      const status = (err as { status?: number }).status;
+      if (status === 409) {
+        action.status = "conflict";
+        action.error = "Conflito de versão — recarregue a OS";
+        conflicts++;
+      } else {
+        action.retryCount++;
+        action.status = action.retryCount >= MAX_RETRIES ? "error" : "pending";
+        action.nextAttemptAt = now + backoff(action.retryCount);
+        action.error = err instanceof Error ? err.message : "Erro desconhecido";
+        failed++;
+      }
     }
-
-    saveQueue(queue);
-    onProgress?.(synced + failed, pending.length);
+    await putAction(action);
+    onProgress?.(synced + failed + conflicts, pending.length);
   }
 
-  return { synced, failed };
+  return { synced, failed, conflicts };
 }
