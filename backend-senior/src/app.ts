@@ -79,11 +79,12 @@ export async function buildApp(): Promise<FastifyInstance> {
       return reply.status(400).send({ error: 'Dados invalidos', details: error.issues, reqId: request.id });
     }
     if (error instanceof AppError) {
-      return reply.status(error.statusCode).send({ error: error.message, reqId: request.id });
+      return reply.status(error.statusCode).send({ error: error.message, code: error.code, reqId: request.id });
     }
     const statusCode = error.statusCode ?? 500;
     reply.status(statusCode).send({
       error: statusCode === 500 ? 'Erro interno do servidor' : error.message,
+      code: (error as { code?: string }).code,
       reqId: request.id,
     });
   });

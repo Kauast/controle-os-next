@@ -1,9 +1,2 @@
-export class AppError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode: number = 400,
-  ) {
-    super(message);
-    this.name = 'AppError';
-  }
-}
+// Fonte única de erros de domínio. Mantém compat com imports legados de './lib/errors'.
+export * from '../shared/errors';
