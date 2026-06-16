@@ -377,21 +377,27 @@ export class FinancialService {
   }
 
   async overdueCheck(companyId: string) {
-    await prisma.payment.updateMany({
-      where: {
-        companyId,
-        status: 'PENDING',
-        dueDate: { lt: new Date() },
-      },
-      data: { status: 'OVERDUE' },
-    });
-    await prisma.invoice.updateMany({
-      where: {
-        companyId,
-        status: { in: ['ISSUED', 'PARTIAL'] },
-        dueDate: { lt: new Date() },
-      },
-      data: { status: 'OVERDUE' },
+    return prisma.$transaction(async (tx) => {
+      const cutoff = new Date();
+      const paymentResult = await tx.payment.updateMany({
+        where: {
+          companyId,
+          status: 'PENDING',
+          dueDate: { lt: cutoff },
+        },
+        data: { status: 'OVERDUE' },
+      });
+
+      const invoiceResult = await tx.invoice.updateMany({
+        where: {
+          companyId,
+          status: { in: ['ISSUED', 'PARTIAL'] },
+          dueDate: { lt: cutoff },
+        },
+        data: { status: 'OVERDUE' },
+      });
+
+      return { paymentsUpdated: paymentResult.count, invoicesUpdated: invoiceResult.count };
     });
   }
 }

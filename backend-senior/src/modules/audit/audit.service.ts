@@ -31,9 +31,10 @@ export async function audit(params: AuditParams): Promise<void> {
         userAgent: params.userAgent,
       },
     });
-  } catch {
+  } catch (err) {
     // Falha de auditoria nunca derruba a requisição.
     // Em produção, considere enviar para um serviço de log secundário.
+    console.error('[audit] falha ao registrar evento:', err);
   }
 }
 
